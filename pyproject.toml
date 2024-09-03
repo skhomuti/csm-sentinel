@@ -1,0 +1,17 @@
+[project]
+name = "csm-bot"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "web3>=7",
+    "python-telegram-bot>=21.4",
+    "python-dotenv",
+    "tqdm>=4.66.5",
+    "aiogram>=3.12.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
