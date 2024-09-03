@@ -10,6 +10,18 @@ from csm_bot.models import (
 from csm_bot.models import CSM_ABI
 from csm_bot.texts import EVENT_MESSAGES, EVENT_MESSAGE_FOOTER, EVENT_MESSAGE_FOOTER_TX_ONLY, EVENT_EMITS
 
+# This is a dictionary that will be populated with the events to follow
+CSM_EVENTS_TO_FOLLOW = {}
+
+
+class RegisterEvent:
+    def __init__(self, event_name):
+        self.event_name = event_name
+
+    def __call__(self, func):
+        CSM_EVENTS_TO_FOLLOW[self.event_name] = func
+        return func
+
 
 class EventMessages:
     def __init__(self, w3: AsyncWeb3):
@@ -31,21 +43,25 @@ class EventMessages:
             return EVENT_MESSAGE_FOOTER_TX_ONLY(tx_link)
         return EVENT_MESSAGE_FOOTER(event.args['nodeOperatorId'], tx_link).as_markdown()
 
+    @RegisterEvent('DepositedSigningKeysCountChanged')
     async def deposited_signing_keys_count_changed(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         return template(event.args['depositedKeysCount']) + self.footer(event)
 
+    @RegisterEvent('ELRewardsStealingPenaltyCancelled')
     async def el_rewards_stealing_penalty_cancelled(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         remaining_amount = humanize_wei(await self.accounting.functions.getActualLockedBond(event.args['nodeOperatorId']).call())
         return template(remaining_amount) + self.footer(event)
 
+    @RegisterEvent('ELRewardsStealingPenaltyReported')
     async def el_rewards_stealing_penalty_reported(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         block_hash = self.w3.to_hex(event.args['proposedBlockHash'])
         block_link = ETHERSCAN_BLOCK_URL_TEMPLATE.format(block_hash)
         return template(humanize_wei(event.args['stolenAmount']), block_link) + self.footer(event)
 
+    @RegisterEvent('ELRewardsStealingPenaltySettled')
     async def el_rewards_stealing_penalty_settled(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         logs = await self.accounting.events.BondBurned().get_logs(from_block=event.block)
@@ -56,65 +72,57 @@ class EventMessages:
             amount = 0
         return template(humanize_wei(amount)) + self.footer(event)
 
+    @RegisterEvent('InitialSlashingSubmitted')
     async def initial_slashing_submitted(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         key = self.w3.to_hex(await self.csm.functions.getSigningKeys(event.args["nodeOperatorId"], event.args['keyIndex'], 1).call())
         key_url = BEACONCHAIN_URL_TEMPLATE.format(key)
         return template(key, key_url) + self.footer(event)
 
+    @RegisterEvent('KeyRemovalChargeApplied')
     async def key_removal_charge_applied(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         amount = await self.csm.functions.keyRemovalCharge().call(block_identifier=event.block)
         return template(humanize_wei(amount)) + self.footer(event)
 
+    @RegisterEvent('NodeOperatorManagerAddressChangeProposed')
     async def node_operator_manager_address_change_proposed(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         return template(event.args['newProposedAddress']) + self.footer(event)
 
+    @RegisterEvent('NodeOperatorManagerAddressChanged')
     async def node_operator_manager_address_changed(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         return template(event.args['newAddress']) + self.footer(event)
 
+    @RegisterEvent('NodeOperatorRewardAddressChangeProposed')
     async def node_operator_reward_address_change_proposed(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         return template(event.args['newProposedAddress']) + self.footer(event)
 
+    @RegisterEvent('NodeOperatorRewardAddressChanged')
     async def node_operator_reward_address_changed(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         return template(event.args['newAddress']) + self.footer(event)
 
+    @RegisterEvent('StuckSigningKeysCountChanged')
     async def stuck_signing_keys_count_changed(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         return template(event.args['stuckKeysCount']) + self.footer(event)
 
+    @RegisterEvent('VettedSigningKeysCountDecreased')
     async def vetted_signing_keys_count_decreased(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         return template() + self.footer(event)
 
+    @RegisterEvent('WithdrawalSubmitted')
     async def withdrawal_submitted(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         key = self.w3.to_hex(await self.csm.functions.getSigningKeys(event.args["nodeOperatorId"], event.args['keyIndex'], 1).call())
         key_url = BEACONCHAIN_URL_TEMPLATE.format(key)
         return template(key, key_url, humanize_wei(event.args['amount'])) + self.footer(event)
 
+    @RegisterEvent('TotalSigningKeysCountChanged')
     async def total_signing_keys_count_changed(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         return template(event.args['totalKeysCount']) + self.footer(event)
-
-
-CSM_EVENTS_TO_FOLLOW = {
-        'DepositedSigningKeysCountChanged': EventMessages.deposited_signing_keys_count_changed,
-        'ELRewardsStealingPenaltyCancelled': EventMessages.el_rewards_stealing_penalty_cancelled,
-        'ELRewardsStealingPenaltyReported': EventMessages.el_rewards_stealing_penalty_reported,
-        'ELRewardsStealingPenaltySettled': EventMessages.el_rewards_stealing_penalty_settled,
-        'InitialSlashingSubmitted': EventMessages.initial_slashing_submitted,
-        'KeyRemovalChargeApplied': EventMessages.key_removal_charge_applied,
-        'NodeOperatorManagerAddressChangeProposed': EventMessages.node_operator_manager_address_change_proposed,
-        'NodeOperatorManagerAddressChanged': EventMessages.node_operator_manager_address_changed,
-        'NodeOperatorRewardAddressChangeProposed': EventMessages.node_operator_reward_address_change_proposed,
-        'NodeOperatorRewardAddressChanged': EventMessages.node_operator_reward_address_changed,
-        'StuckSigningKeysCountChanged': EventMessages.stuck_signing_keys_count_changed,
-        'VettedSigningKeysCountDecreased': EventMessages.vetted_signing_keys_count_decreased,
-        'WithdrawalSubmitted': EventMessages.withdrawal_submitted,
-        'TotalSigningKeysCountChanged': EventMessages.total_signing_keys_count_changed,
-}
