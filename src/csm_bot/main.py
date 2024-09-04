@@ -50,7 +50,7 @@ class TelegramSubscription(Subscription):
         await application.update_queue.put(event)
 
     async def handle_event_log(self, event: Event, context: ContextTypes.DEFAULT_TYPE):
-        print("Event received: ", event.event, event.args)
+        print("Handle event:", event.event, event.args)
         chats = []
         if "nodeOperatorId" in event.args:
             chats = context.bot_data["no_ids_to_chats"].get(str(event.args["nodeOperatorId"]), set())
@@ -66,6 +66,7 @@ class TelegramSubscription(Subscription):
         await application.update_queue.put(block)
 
     async def handle_new_block(self, block: Block, context):
+        print("Handle block:", block.number)
         application.bot_data['block'] = block.number
 
 
@@ -179,15 +180,15 @@ async def main():
     if "block" not in application.bot_data:
         application.bot_data["block"] = 0
     print("Bot started. Latest processed block number: ", application.bot_data.get('block'))
-    await application.updater.start_polling()
-    await subscription.subscribe()
     try:
-        while True:
-            await asyncio.sleep(1)
-    except CancelledError:
+        await application.updater.start_polling()
+        subscription.setup_signal_handlers(asyncio.get_running_loop())
+        await subscription.process_blocks_from(application.bot_data.get('block'))
+        await subscription.subscribe()
+    except asyncio.CancelledError:
         pass
     finally:
-
+        await subscription.shutdown()
         await application.updater.stop()
         await application.stop()
         await application.shutdown()
