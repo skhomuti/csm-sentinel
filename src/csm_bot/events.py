@@ -1,3 +1,4 @@
+import datetime
 import os
 
 from eth_utils import humanize_wei
@@ -11,7 +12,7 @@ from csm_bot.models import CSM_ABI
 from csm_bot.texts import EVENT_MESSAGES, EVENT_MESSAGE_FOOTER, EVENT_MESSAGE_FOOTER_TX_ONLY, EVENT_EMITS
 
 # This is a dictionary that will be populated with the events to follow
-CSM_EVENTS_TO_FOLLOW = {}
+EVENTS_TO_FOLLOW = {}
 
 
 class RegisterEvent:
@@ -19,7 +20,7 @@ class RegisterEvent:
         self.event_name = event_name
 
     def __call__(self, func):
-        CSM_EVENTS_TO_FOLLOW[self.event_name] = func
+        EVENTS_TO_FOLLOW[self.event_name] = func
         return func
 
 
@@ -33,7 +34,7 @@ class EventMessages:
         return EVENT_EMITS.format(event.event, event.args)
 
     async def get_event_message(self, event: Event):
-        callback = CSM_EVENTS_TO_FOLLOW.get(event.event, self.default)
+        callback = EVENTS_TO_FOLLOW.get(event.event, self.default)
         return await callback(self, event)
 
     @staticmethod
@@ -126,3 +127,12 @@ class EventMessages:
     async def total_signing_keys_count_changed(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         return template(event.args['totalKeysCount']) + self.footer(event)
+
+    @RegisterEvent('ValidatorExitRequest')
+    async def validator_exit_request(self, event: Event):
+        template: callable = EVENT_MESSAGES.get(event.event)
+        key = self.w3.to_hex(event.args['validatorPubkey'])
+        key_url = BEACONCHAIN_URL_TEMPLATE.format(key)
+        request_date = datetime.datetime.fromtimestamp(event.args['timestamp'], datetime.UTC)
+        exit_until = request_date + datetime.timedelta(days=4)
+        return template(key, key_url, request_date, exit_until) + self.footer(event)

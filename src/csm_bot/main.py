@@ -42,9 +42,9 @@ class Callback:
 class TelegramSubscription(Subscription):
     application: Application
 
-    def __init__(self, provider, application: Application):
+    def __init__(self, w3, application: Application):
         self.application = application
-        super().__init__(provider)
+        super().__init__(w3)
 
     async def process_event_log(self, event: Event):
         await application.update_queue.put(event)
@@ -172,6 +172,7 @@ application: Application
 subscription: TelegramSubscription
 eventMessages: EventMessages
 
+
 async def main():
     await application.initialize()
     await application.start()
@@ -180,13 +181,16 @@ async def main():
     if "block" not in application.bot_data:
         application.bot_data["block"] = 0
     print("Bot started. Latest processed block number: ", application.bot_data.get('block'))
+
     try:
         await application.updater.start_polling()
+
         subscription.setup_signal_handlers(asyncio.get_running_loop())
         await subscription.process_blocks_from(application.bot_data.get('block'))
         await subscription.subscribe()
+
     except asyncio.CancelledError:
-        pass
+        print("CancelledError")
     finally:
         await subscription.shutdown()
         await application.updater.stop()
