@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta
 
 from aiogram.utils.formatting import Text, Bold, TextLink, Code
 
@@ -67,6 +68,11 @@ EVENT_MESSAGES = {
     "TotalSigningKeysCountChanged": lambda count:
     markdown("👀 ", Bold("Total keys count changed"), nl(),
              "New keys count: ", Code(count)),
+    "ValidatorExitRequest": lambda key, key_url, request_date, exit_until:
+    markdown("🚨 ", Bold("Validator exit requested"), nl(),
+             "Make sure to exit the key before ", exit_until, nl(1),
+             "Requested key: ", TextLink(key, url=key_url), nl(1),
+             "Request date: ", Code(request_date)),
 }
 
 EVENT_MESSAGE_FOOTER = lambda noId, link: Text(nl(), f"nodeOperatorId: {noId}\n", TextLink("Transaction", url=link))
