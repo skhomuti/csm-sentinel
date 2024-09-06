@@ -1,14 +1,13 @@
 import asyncio
 import logging
 import os
-from asyncio import CancelledError
 from collections import defaultdict
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions
 from telegram.constants import ParseMode
 from telegram.ext import (
     ApplicationBuilder, ContextTypes, CommandHandler, PicklePersistence, MessageHandler, filters,
-    CallbackQueryHandler, ConversationHandler, Application, TypeHandler,
+    CallbackQueryHandler, ConversationHandler, Application, TypeHandler, BaseRateLimiter, AIORateLimiter,
 )
 from web3 import AsyncWeb3, WebSocketProvider
 
@@ -54,6 +53,7 @@ class TelegramSubscription(Subscription):
         chats = []
         if "nodeOperatorId" in event.args:
             chats = context.bot_data["no_ids_to_chats"].get(str(event.args["nodeOperatorId"]), set())
+
         message = await eventMessages.get_event_message(event)
 
         for chat in chats:
@@ -204,6 +204,7 @@ if __name__ == '__main__':
         ApplicationBuilder()
         .token(os.getenv("TOKEN"))
         .persistence(persistence)
+        .rate_limiter(AIORateLimiter(max_retries=5))
         .build()
     )
     provider = AsyncWeb3(WebSocketProvider(os.getenv("WEB3_SOCKET_PROVIDER"), max_connection_retries=-1))

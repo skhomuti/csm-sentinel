@@ -87,6 +87,15 @@ wheels = [
 ]
 
 [[package]]
+name = "aiolimiter"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/df/62/6de944a6839a68f7d69e552e26d12234d9c556472e4c277a3a563013640a/aiolimiter-1.1.0.tar.gz", hash = "sha256:461cf02f82a29347340d031626c92853645c099cb5ff85577b831a7bd21132b5", size = 6229 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/60/69/4b7dea755fafa10b248928da836a2cc8b5cff0762f363234e24218040f8e/aiolimiter-1.1.0-py3-none-any.whl", hash = "sha256:0b4997961fc58b8df40279e739f9cf0d3e255e63e9a44f64df567a8c17241e24", size = 7212 },
+]
+
+[[package]]
 name = "aiosignal"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -266,16 +275,16 @@ source = { editable = "." }
 dependencies = [
     { name = "aiogram" },
     { name = "python-dotenv" },
-    { name = "python-telegram-bot" },
+    { name = "python-telegram-bot", extra = ["rate-limiter"] },
     { name = "tqdm" },
     { name = "web3" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "aiogram" },
+    { name = "aiogram", specifier = ">=3.12.0" },
     { name = "python-dotenv" },
-    { name = "python-telegram-bot", specifier = ">=21.4" },
+    { name = "python-telegram-bot", extras = ["rate-limiter"], specifier = ">=21.4" },
     { name = "tqdm", specifier = ">=4.66.5" },
     { name = "web3", specifier = ">=7" },
 ]
@@ -692,6 +701,11 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/02/51/8b16fde0420adac53cc628c5363e9c1eb316a8ee23bd698ea7ae5148d07c/python_telegram_bot-21.4.tar.gz", hash = "sha256:d4d41f29f2e2c02920a4be75d9c1ecf85ec381bf47bbeb51af5b097e340b8377", size = 423626 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d8/f0/b1c3f306d6846fb10d7bf737e2de010f33e43e682686e682b7cda93231a7/python_telegram_bot-21.4-py3-none-any.whl", hash = "sha256:71ce864130af43b48be70ff0593ef4db31d99d92aa64a2933289b8d544e6e9df", size = 644814 },
+]
+
+[package.optional-dependencies]
+rate-limiter = [
+    { name = "aiolimiter" },
 ]
 
 [[package]]
