@@ -41,7 +41,7 @@ class EventMessages:
     def footer(event: Event):
         tx_link = ETHERSCAN_TX_URL_TEMPLATE.format(event.tx.hex())
         if 'nodeOperatorId' not in event.args:
-            return EVENT_MESSAGE_FOOTER_TX_ONLY(tx_link)
+            return EVENT_MESSAGE_FOOTER_TX_ONLY(tx_link).as_markdown()
         return EVENT_MESSAGE_FOOTER(event.args['nodeOperatorId'], tx_link).as_markdown()
 
     @RegisterEvent('DepositedSigningKeysCountChanged')
@@ -136,3 +136,13 @@ class EventMessages:
         request_date = datetime.datetime.fromtimestamp(event.args['timestamp'], datetime.UTC)
         exit_until = request_date + datetime.timedelta(days=4)
         return template(key, key_url, request_date, exit_until) + self.footer(event)
+
+    @RegisterEvent('PublicRelease')
+    async def public_release(self, event: Event):
+        template: callable = EVENT_MESSAGES.get(event.event)
+        return template() + self.footer(event)
+
+    @RegisterEvent("DistributionDataUpdated")
+    async def distribution_data_updated(self, event: Event):
+        template: callable = EVENT_MESSAGES.get(event.event)
+        return template() + self.footer(event)

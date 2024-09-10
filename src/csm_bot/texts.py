@@ -73,6 +73,13 @@ EVENT_MESSAGES = {
              "Make sure to exit the key before ", exit_until, nl(1),
              "Requested key: ", TextLink(key, url=key_url), nl(1),
              "Request date: ", Code(request_date)),
+    "PublicRelease": lambda:
+    markdown("🎉 ", Bold("Public release of CSM is here!"), nl(),
+             "Now everyone can join the CSM and upload any number of keys."),
+    "DistributionDataUpdated": lambda:
+    markdown("📈 ", Bold("Rewards distributed!"), nl(),
+             "Follow the ", TextLink("CSM UI", url=os.getenv("CSM_UI_URL")),
+             " for checking amounts and claiming rewards."),
 }
 
 EVENT_MESSAGE_FOOTER = lambda noId, link: Text(nl(), f"nodeOperatorId: {noId}\n", TextLink("Transaction", url=link))
