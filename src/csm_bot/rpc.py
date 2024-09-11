@@ -43,6 +43,7 @@ class Subscription:
 
     def setup_signal_handlers(self, loop):
         loop.add_signal_handler(signal.SIGINT, self._signal_handler, loop)
+        loop.add_signal_handler(signal.SIGTERM, self._signal_handler, loop)
 
     def _signal_handler(self, loop: BaseEventLoop):
         async def _disconnect():

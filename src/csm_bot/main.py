@@ -3,6 +3,7 @@ import logging
 import os
 from collections import defaultdict
 from itertools import chain
+from pathlib import Path
 
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions, Chat, ChatMemberUpdated,
@@ -277,7 +278,8 @@ async def main():
         await application.updater.start_polling()
 
         subscription.setup_signal_handlers(asyncio.get_running_loop())
-        await subscription.process_blocks_from(application.bot_data.get('block'))
+        if application.bot_data.get('block') != 0:
+            await subscription.process_blocks_from(application.bot_data.get('block'))
         await subscription.subscribe()
 
     except asyncio.CancelledError:
@@ -290,7 +292,10 @@ async def main():
 
 
 if __name__ == '__main__':
-    persistence = PicklePersistence(filepath='persistence.pkl')
+    storage_path = Path(os.getenv("FILESTORAGE_PATH", ".storage"))
+    if not storage_path.exists():
+        storage_path.mkdir(parents=True)
+    persistence = PicklePersistence(filepath=storage_path / "persistence.pkl")
     application = (
         ApplicationBuilder()
         .token(os.getenv("TOKEN"))
