@@ -18,17 +18,21 @@ markdown = lambda *args, **kwargs: Text(*args, **kwargs).as_markdown()
 header = lambda x: f"*{x}*\n\n"
 nl = lambda x=2: "\n" * x
 
-START_BUTTON_FOLLOW = "Follow to NO updates"
-START_BUTTON_UNFOLLOW = "Unfollow from NO updates"
+WELCOME_TEXT = ("Welcome to the CSM Sentinel! "
+                "Here you can follow Node Operators and receive notifications about their events.")
+START_BUTTON_FOLLOW = "Follow"
+START_BUTTON_UNFOLLOW = "Unfollow"
 FOLLOW_NODE_OPERATOR_BACK = "Back"
-FOLLOW_NODE_OPERATOR_TEXT = "Please enter the node operator id you want to follow:"
-FOLLOW_NODE_OPERATOR_FOLLOWING = "You are following the node operator ids: {}" + nl()
+FOLLOW_NODE_OPERATOR_TEXT = "Please enter the Node Operator id you want to follow:"
+FOLLOW_NODE_OPERATOR_FOLLOWING = "Node Operators you are following: {}" + nl()
 UNFOLLOW_NODE_OPERATOR_BACK = "Back"
-UNFOLLOW_NODE_OPERATOR_TEXT = "Please enter the node operator id you want to unfollow:"
-UNFOLLOW_NODE_OPERATOR_NOT_FOLLOWING = "You are not following any node operators."
-UNFOLLOW_NODE_OPERATOR_FOLLOWING = "You are following the node operator ids: {}" + nl()
-NODE_OPERATOR_FOLLOWED = "Node operator id {} followed!"
-NODE_OPERATOR_UNFOLLOWED = "Node operator id {} unfollowed!"
+UNFOLLOW_NODE_OPERATOR_TEXT = "Please enter the Node Operator id you want to unfollow:"
+UNFOLLOW_NODE_OPERATOR_NOT_FOLLOWING = "You are not following any Node Operators."
+UNFOLLOW_NODE_OPERATOR_FOLLOWING = "Node Operators you are following: {}" + nl()
+NODE_OPERATOR_FOLLOWED = "You are now following Node Operator #{}"
+NODE_OPERATOR_CANT_FOLLOW = "Invalid Node Operator id. Please enter the correct id."
+NODE_OPERATOR_UNFOLLOWED = "You are no longer following Node Operator #{}"
+NODE_OPERATOR_CANT_UNFOLLOW = "Can't unfollow the Node Operator you are not following. \nPlease enter the correct id."
 EVENT_EMITS = "Event {} emitted with data: \n{}"
 
 EVENT_MESSAGE_FOOTER = lambda noId, link: Text(nl(), f"nodeOperatorId: {noId}\n", TextLink("Transaction", url=link))
@@ -42,7 +46,7 @@ def deposited_signing_keys_count_changed(x):
 
 @RegisterEventMessage("ELRewardsStealingPenaltyCancelled")
 def el_rewards_stealing_penalty_cancelled(remaining):
-    return markdown("😮‍💨 ", Bold("Cancelled penalty for stealing EL rewards"), nl(),
+    return markdown("😮‍💨 ", Bold("EL rewards stealing penalty cancelled"), nl(),
                     "Remaining amount: ", Code(remaining))
 
 
@@ -50,20 +54,20 @@ def el_rewards_stealing_penalty_cancelled(remaining):
 def el_rewards_stealing_penalty_reported(rewards, block_link):
     return markdown("🚨 ", Bold("Penalty for stealing EL rewards reported"), nl(),
                     Code(rewards), " rewards from the ", TextLink("block", url=block_link),
-                    " were transferred to the wrong EL rewards address", nl(1),
+                    " were transferred to the wrong EL address", nl(1),
                     "See the ", TextLink("guide", url="https://docs.lido.fi/staking-modules/csm/guides/mev-stealing"),
                     " for more details")
 
 
 @RegisterEventMessage("ELRewardsStealingPenaltySettled")
 def el_rewards_stealing_penalty_settled(burnt):
-    return markdown("🚨 ", Bold("Penalty for stealing EL rewards settled"), nl(),
+    return markdown("🚨 ", Bold("EL rewards stealing penalty confirmed and applied"), nl(),
                     Code(burnt), " burnt from bond")
 
 
 @RegisterEventMessage("InitialSlashingSubmitted")
 def initial_slashing_submitted(key, key_url):
-    return markdown("😱 ", Bold("Initial slashing submitted"), nl(),
+    return markdown("😱 ", Bold("Initial slashing submitted for one of the validators"), nl(),
                     "Slashed key: ", TextLink(key, url=key_url), nl(1),
                     "See the ", TextLink("guide", url="https://docs.lido.fi/staking-modules/csm/guides/slashing"),
                     " for more details")
@@ -77,25 +81,25 @@ def key_removal_charge_applied(amount):
 
 @RegisterEventMessage("NodeOperatorManagerAddressChangeProposed")
 def node_operator_manager_address_change_proposed(address):
-    return markdown("ℹ️ ", Bold("Proposed change of the node operator manager address"), nl(),
+    return markdown("ℹ️ ", Bold("New manager address proposed"), nl(),
                     "Proposed address: ", Code(address))
 
 
 @RegisterEventMessage("NodeOperatorManagerAddressChanged")
 def node_operator_manager_address_changed(address):
-    return markdown("✅ ", Bold("Node operator manager address changed"), nl(),
+    return markdown("✅ ", Bold("Manager address changed"), nl(),
                     "New address: ", Code(address))
 
 
 @RegisterEventMessage("NodeOperatorRewardAddressChangeProposed")
 def node_operator_reward_address_change_proposed(address):
-    return markdown("ℹ️ ", Bold("Proposed change of the node operator reward address"), nl(),
+    return markdown("ℹ️ ", Bold("New rewards address proposed"), nl(),
                     "Proposed address: ", Code(address))
 
 
 @RegisterEventMessage("NodeOperatorRewardAddressChanged")
 def node_operator_reward_address_changed(address):
-    return markdown("✅ ", Bold("Node operator reward address changed"), nl(),
+    return markdown("✅ ", Bold("Rewards address changed"), nl(),
                     "New address: ", Code(address))
 
 
@@ -109,21 +113,26 @@ def stuck_signing_keys_count_changed(count):
 @RegisterEventMessage("VettedSigningKeysCountDecreased")
 def vetted_signing_keys_count_decreased():
     return markdown("🚨 ", Bold("Vetted keys count decreased"), nl(),
-                    "Consider removing invalid key and upload new one. Check ",
+                    "Consider removing invalid keys. Check ",
                     TextLink("CSM UI", url=os.getenv("CSM_UI_URL")), " for more details")
 
 
 @RegisterEventMessage("WithdrawalSubmitted")
 def withdrawal_submitted(key, key_url, amount):
-    return markdown("👀 ", Bold("Withdrawal submitted"), nl(),
-                    "Withdrawn the following key: ", TextLink(key, url=key_url),
-                    " with exit balance: ", Code(amount))
+    return markdown("👀 ", Bold("Information about validator withdrawal has been submitted"), nl(),
+                    "Withdrawn key: ", TextLink(key, url=key_url),
+                    " with exit balance: ", Code(amount), nl(),
+                    "Check the amount of the bond released at ", TextLink("CSM UI", url=os.getenv("CSM_UI_URL")))
 
 
 @RegisterEventMessage("TotalSigningKeysCountChanged")
-def total_signing_keys_count_changed(count):
-    return markdown("👀 ", Bold("Total keys count changed"), nl(),
-                    "New keys count: ", Code(count))
+def total_signing_keys_count_changed(count, count_before):
+    if count > count_before:
+        return markdown("👀 ", Bold("New keys uploaded"), nl(),
+                        "Keys count: ", Code(f"{count_before} -> {count}"))
+    else:
+        return markdown("🚨 ", Bold("Key removed"), nl(),
+                        "Total keys: ", Code(count))
 
 
 @RegisterEventMessage("ValidatorExitRequest")
@@ -144,4 +153,4 @@ def public_release():
 def distribution_data_updated():
     return markdown("📈 ", Bold("Rewards distributed!"), nl(),
                     "Follow the ", TextLink("CSM UI", url=os.getenv("CSM_UI_URL")),
-                    " for checking amounts and claiming rewards.")
+                    " to check new claimable rewards.")
