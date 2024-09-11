@@ -22,6 +22,7 @@ from csm_bot.texts import (
     START_BUTTON_FOLLOW, START_BUTTON_UNFOLLOW, FOLLOW_NODE_OPERATOR_BACK, FOLLOW_NODE_OPERATOR_TEXT,
     UNFOLLOW_NODE_OPERATOR_BACK, UNFOLLOW_NODE_OPERATOR_TEXT, UNFOLLOW_NODE_OPERATOR_NOT_FOLLOWING,
     NODE_OPERATOR_FOLLOWED, NODE_OPERATOR_UNFOLLOWED, UNFOLLOW_NODE_OPERATOR_FOLLOWING, FOLLOW_NODE_OPERATOR_FOLLOWING,
+    WELCOME_TEXT, NODE_OPERATOR_CANT_UNFOLLOW, NODE_OPERATOR_CANT_FOLLOW,
 )
 
 logging.basicConfig(
@@ -164,7 +165,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="Hello!",
+        text=WELCOME_TEXT,
         reply_markup=reply_markup
     )
     return States.WELCOME
@@ -180,7 +181,7 @@ async def start_over(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
-        text="Hello!",
+        text=WELCOME_TEXT,
         reply_markup=reply_markup
     )
     return States.WELCOME
@@ -196,19 +197,28 @@ async def follow_node_operator(update: Update, context: ContextTypes.DEFAULT_TYP
     ]
     text = FOLLOW_NODE_OPERATOR_TEXT
     if node_operator_ids:
-        text = FOLLOW_NODE_OPERATOR_FOLLOWING.format(', '.join(node_operator_ids)) + text
+        text = FOLLOW_NODE_OPERATOR_FOLLOWING.format(', '.join(map(lambda x: f"#{x}", node_operator_ids))) + text
     await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup([keyboard]))
     return States.FOLLOW_NODE_OPERATOR
 
 
 async def follow_node_operator_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        InlineKeyboardButton(UNFOLLOW_NODE_OPERATOR_BACK, callback_data=Callback.BACK)
+    ]
     message = update.message
-    # TODO validate node operator id
     node_operator_id = message.text
-    context.bot_data["no_ids_to_chats"][node_operator_id].add(message.chat_id)
-    context.chat_data.setdefault("node_operators", set()).add(node_operator_id)
-    await message.reply_text(NODE_OPERATOR_FOLLOWED.format(node_operator_id))
-    return States.WELCOME
+    if node_operator_id.startswith("#"):
+        node_operator_id = message.text[1:]
+    # TODO provider should be a separate instance
+    if node_operator_id.isdigit() and await eventMessages.csm.functions.getNodeOperatorsCount().call() >= int(node_operator_id):
+        context.bot_data["no_ids_to_chats"][node_operator_id].add(message.chat_id)
+        context.chat_data.setdefault("node_operators", set()).add(node_operator_id)
+        await message.reply_text(NODE_OPERATOR_FOLLOWED.format(node_operator_id), reply_markup=InlineKeyboardMarkup([keyboard]))
+        return States.FOLLOW_NODE_OPERATOR
+    else:
+        await message.reply_text(NODE_OPERATOR_CANT_FOLLOW, reply_markup=InlineKeyboardMarkup([keyboard]))
+        return States.FOLLOW_NODE_OPERATOR
 
 
 async def unfollow_node_operator(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -220,7 +230,7 @@ async def unfollow_node_operator(update: Update, context: ContextTypes.DEFAULT_T
         InlineKeyboardButton(UNFOLLOW_NODE_OPERATOR_BACK, callback_data=Callback.BACK)
     ]
     if node_operator_ids:
-        text = UNFOLLOW_NODE_OPERATOR_FOLLOWING.format(', '.join(node_operator_ids))
+        text = UNFOLLOW_NODE_OPERATOR_FOLLOWING.format(', '.join(map(lambda x: f"#{x}", node_operator_ids)))
         text += UNFOLLOW_NODE_OPERATOR_TEXT
     else:
         text = UNFOLLOW_NODE_OPERATOR_NOT_FOLLOWING
@@ -229,16 +239,24 @@ async def unfollow_node_operator(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def unfollow_node_operator_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        InlineKeyboardButton(UNFOLLOW_NODE_OPERATOR_BACK, callback_data=Callback.BACK)
+    ]
+
     message = update.message
-    # TODO validate node operator id
     node_operator_id = message.text
+    if node_operator_id.startswith("#"):
+        node_operator_id = message.text[1:]
     node_operator_ids = context.chat_data.get('node_operators')
     if node_operator_ids and node_operator_id in node_operator_ids:
         node_operator_ids.remove(node_operator_id)
         context.chat_data['node_operators'] = node_operator_ids
         context.bot_data["no_ids_to_chats"][node_operator_id].remove(message.chat_id)
-    await message.reply_text(NODE_OPERATOR_UNFOLLOWED.format(node_operator_id))
-    return States.WELCOME
+        await message.reply_text(NODE_OPERATOR_UNFOLLOWED.format(node_operator_id), reply_markup=InlineKeyboardMarkup([keyboard]))
+        return States.UNFOLLOW_NODE_OPERATOR
+    else:
+        await message.reply_text(NODE_OPERATOR_CANT_UNFOLLOW, reply_markup=InlineKeyboardMarkup([keyboard]))
+        return States.UNFOLLOW_NODE_OPERATOR
 
 
 application: Application
