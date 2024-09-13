@@ -57,7 +57,7 @@ class TelegramSubscription(Subscription):
         await application.update_queue.put(event)
 
     async def handle_event_log(self, event: Event, context: ContextTypes.DEFAULT_TYPE):
-        logger.info("Handle event: %s %s", event.event, event.args)
+        logger.info("Handle event on the block %s: %s %s", event.block, event.event, event.args)
         if "nodeOperatorId" in event.args:
             chats = context.bot_data["no_ids_to_chats"].get(str(event.args["nodeOperatorId"]), set())
         else:
@@ -76,7 +76,7 @@ class TelegramSubscription(Subscription):
         await application.update_queue.put(block)
 
     async def handle_new_block(self, block: Block, context):
-        logger.info("Handle block: %s", block.number)
+        logger.debug("Handle block: %s", block.number)
         application.bot_data['block'] = block.number
 
 
