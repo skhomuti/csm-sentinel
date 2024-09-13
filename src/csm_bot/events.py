@@ -126,7 +126,7 @@ class EventMessages:
     @RegisterEvent('TotalSigningKeysCountChanged')
     async def total_signing_keys_count_changed(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
-        node_operator = self.csm.functions.getNodeOperator(event.args["nodeOperatorId"]).call(block_identifier=event.block - 1)
+        node_operator = await self.csm.functions.getNodeOperator(event.args["nodeOperatorId"]).call(block_identifier=event.block - 1)
         return template(event.args['totalKeysCount'], node_operator["totalAddedKeys"]) + self.footer(event)
 
     @RegisterEvent('ValidatorExitRequest')
