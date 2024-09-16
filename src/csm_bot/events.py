@@ -15,6 +15,10 @@ from csm_bot.texts import EVENT_MESSAGES, EVENT_MESSAGE_FOOTER, EVENT_MESSAGE_FO
 EVENTS_TO_FOLLOW = {}
 
 
+def _format_date(date: datetime.datetime):
+    return date.strftime("%a %d %b %Y, %I:%M%p UTC")
+
+
 class RegisterEvent:
     def __init__(self, event_name):
         self.event_name = event_name
@@ -27,8 +31,8 @@ class RegisterEvent:
 class EventMessages:
     def __init__(self, w3: AsyncWeb3):
         self.w3 = w3
-        self.csm = self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_ABI)
-        self.accounting = self.w3.eth.contract(address=os.getenv("ACCOUNTING_ADDRESS"), abi=ACCOUNTING_ABI)
+        self.csm = self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_ABI, decode_tuples=True)
+        self.accounting = self.w3.eth.contract(address=os.getenv("ACCOUNTING_ADDRESS"), abi=ACCOUNTING_ABI, decode_tuples=True)
 
     async def default(self, event: Event):
         return EVENT_EMITS.format(event.event, event.args)
@@ -39,7 +43,7 @@ class EventMessages:
 
     @staticmethod
     def footer(event: Event):
-        tx_link = ETHERSCAN_TX_URL_TEMPLATE.format(event.tx.hex())
+        tx_link = ETHERSCAN_TX_URL_TEMPLATE.format("0x" + event.tx.hex())
         if 'nodeOperatorId' not in event.args:
             return EVENT_MESSAGE_FOOTER_TX_ONLY(tx_link).as_markdown()
         return EVENT_MESSAGE_FOOTER(event.args['nodeOperatorId'], tx_link).as_markdown()
@@ -127,7 +131,7 @@ class EventMessages:
     async def total_signing_keys_count_changed(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         node_operator = await self.csm.functions.getNodeOperator(event.args["nodeOperatorId"]).call(block_identifier=event.block - 1)
-        return template(event.args['totalKeysCount'], node_operator["totalAddedKeys"]) + self.footer(event)
+        return template(event.args['totalKeysCount'], node_operator.totalAddedKeys) + self.footer(event)
 
     @RegisterEvent('ValidatorExitRequest')
     async def validator_exit_request(self, event: Event):
@@ -136,7 +140,7 @@ class EventMessages:
         key_url = BEACONCHAIN_URL_TEMPLATE.format(key)
         request_date = datetime.datetime.fromtimestamp(event.args['timestamp'], datetime.UTC)
         exit_until = request_date + datetime.timedelta(days=4)
-        return template(key, key_url, request_date, exit_until) + self.footer(event)
+        return template(key, key_url, _format_date(request_date), _format_date(exit_until)) + self.footer(event)
 
     @RegisterEvent('PublicRelease')
     async def public_release(self, event: Event):
