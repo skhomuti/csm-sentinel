@@ -61,11 +61,15 @@ class TelegramSubscription(Subscription):
 
     async def handle_event_log(self, event: Event, context: ContextTypes.DEFAULT_TYPE):
         logger.info("Handle event on the block %s: %s %s", event.block, event.event, event.args)
+        actual_chat_ids = (context.bot_data.get("user_ids", set())
+                           .union(context.bot_data.get("group_ids", set()))
+                           .union(context.bot_data.get("channel_ids", set())))
         if "nodeOperatorId" in event.args:
             chats = context.bot_data["no_ids_to_chats"].get(str(event.args["nodeOperatorId"]), set())
         else:
             # all chats that subscribed to any node operator
             chats = set(chain(*context.bot_data["no_ids_to_chats"].values()))
+        chats = chats.intersection(actual_chat_ids)
 
         message = await eventMessages.get_event_message(event)
 
