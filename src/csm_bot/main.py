@@ -16,14 +16,15 @@ from telegram.ext import (
 )
 from web3 import AsyncWeb3, WebSocketProvider
 
-from csm_bot.events import EventMessages
+from csm_bot.events import EventMessages, EVENTS_TO_FOLLOW
 from csm_bot.models import Block, Event
 from csm_bot.rpc import Subscription
 from csm_bot.texts import (
-    START_BUTTON_FOLLOW, START_BUTTON_UNFOLLOW, FOLLOW_NODE_OPERATOR_BACK, FOLLOW_NODE_OPERATOR_TEXT,
-    UNFOLLOW_NODE_OPERATOR_BACK, UNFOLLOW_NODE_OPERATOR_TEXT, UNFOLLOW_NODE_OPERATOR_NOT_FOLLOWING,
+    START_BUTTON_FOLLOW, START_BUTTON_UNFOLLOW, FOLLOW_NODE_OPERATOR_TEXT,
+    UNFOLLOW_NODE_OPERATOR_TEXT, UNFOLLOW_NODE_OPERATOR_NOT_FOLLOWING,
     NODE_OPERATOR_FOLLOWED, NODE_OPERATOR_UNFOLLOWED, UNFOLLOW_NODE_OPERATOR_FOLLOWING, FOLLOW_NODE_OPERATOR_FOLLOWING,
-    WELCOME_TEXT, NODE_OPERATOR_CANT_UNFOLLOW, NODE_OPERATOR_CANT_FOLLOW,
+    WELCOME_TEXT, NODE_OPERATOR_CANT_UNFOLLOW, NODE_OPERATOR_CANT_FOLLOW, EVENT_MESSAGES, EVENT_DESCRIPTIONS,
+    BUTTON_BACK, START_BUTTON_EVENTS,
 )
 
 logging.basicConfig(
@@ -38,12 +39,14 @@ class States:
     WELCOME = "1"
     FOLLOW_NODE_OPERATOR = "2"
     UNFOLLOW_NODE_OPERATOR = "3"
+    FOLLOWED_EVENTS = "4"
 
 
 class Callback:
     FOLLOW_TO_NODE_OPERATOR = "1"
     UNFOLLOW_FROM_NODE_OPERATOR = "2"
-    BACK = "3"
+    FOLLOWED_EVENTS = "3"
+    BACK = "4"
 
 
 class TelegramSubscription(Subscription):
@@ -160,13 +163,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton(START_BUTTON_FOLLOW, callback_data=Callback.FOLLOW_TO_NODE_OPERATOR),
             InlineKeyboardButton(START_BUTTON_UNFOLLOW, callback_data=Callback.UNFOLLOW_FROM_NODE_OPERATOR),
+            InlineKeyboardButton(START_BUTTON_EVENTS, callback_data=Callback.FOLLOWED_EVENTS),
         ],
     ]
+
+    text = WELCOME_TEXT
+    node_operator_ids = sorted(context.chat_data.get('node_operators', {}))
+    if node_operator_ids:
+        text += FOLLOW_NODE_OPERATOR_FOLLOWING.format(', '.join(map(lambda x: f"#{x}", node_operator_ids)))
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=WELCOME_TEXT,
+        text=text,
         reply_markup=reply_markup
     )
     return States.WELCOME
@@ -177,12 +186,18 @@ async def start_over(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton(START_BUTTON_FOLLOW, callback_data=Callback.FOLLOW_TO_NODE_OPERATOR),
             InlineKeyboardButton(START_BUTTON_UNFOLLOW, callback_data=Callback.UNFOLLOW_FROM_NODE_OPERATOR),
+            InlineKeyboardButton(START_BUTTON_EVENTS, callback_data=Callback.FOLLOWED_EVENTS),
         ],
     ]
 
+    text = WELCOME_TEXT
+    node_operator_ids = sorted(context.chat_data.get('node_operators', {}))
+    if node_operator_ids:
+        text += FOLLOW_NODE_OPERATOR_FOLLOWING.format(', '.join(map(lambda x: f"#{x}", node_operator_ids)))
+
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
-        text=WELCOME_TEXT,
+        text=text,
         reply_markup=reply_markup
     )
     return States.WELCOME
@@ -192,9 +207,9 @@ async def follow_node_operator(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
 
-    node_operator_ids = context.chat_data.get('node_operators', {})
+    node_operator_ids = sorted(context.chat_data.get('node_operators', {}))
     keyboard = [
-        InlineKeyboardButton(FOLLOW_NODE_OPERATOR_BACK, callback_data=Callback.BACK)
+        InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)
     ]
     text = FOLLOW_NODE_OPERATOR_TEXT
     if node_operator_ids:
@@ -205,7 +220,7 @@ async def follow_node_operator(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def follow_node_operator_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        InlineKeyboardButton(UNFOLLOW_NODE_OPERATOR_BACK, callback_data=Callback.BACK)
+        InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)
     ]
     message = update.message
     node_operator_id = message.text
@@ -226,9 +241,9 @@ async def unfollow_node_operator(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
 
-    node_operator_ids = context.chat_data.get('node_operators', {})
+    node_operator_ids = sorted(context.chat_data.get('node_operators', {}))
     keyboard = [
-        InlineKeyboardButton(UNFOLLOW_NODE_OPERATOR_BACK, callback_data=Callback.BACK)
+        InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)
     ]
     if node_operator_ids:
         text = UNFOLLOW_NODE_OPERATOR_FOLLOWING.format(', '.join(map(lambda x: f"#{x}", node_operator_ids)))
@@ -241,7 +256,7 @@ async def unfollow_node_operator(update: Update, context: ContextTypes.DEFAULT_T
 
 async def unfollow_node_operator_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        InlineKeyboardButton(UNFOLLOW_NODE_OPERATOR_BACK, callback_data=Callback.BACK)
+        InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)
     ]
 
     message = update.message
@@ -258,6 +273,20 @@ async def unfollow_node_operator_message(update: Update, context: ContextTypes.D
     else:
         await message.reply_text(NODE_OPERATOR_CANT_UNFOLLOW, reply_markup=InlineKeyboardMarkup([keyboard]))
         return States.UNFOLLOW_NODE_OPERATOR
+
+
+async def followed_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    keyboard = [
+        InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)
+    ]
+    text = "Here is the list of events you will receive notifications for:\n"
+    for description in EVENT_DESCRIPTIONS.values():
+        text += f"- {description}\n"
+    await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup([keyboard]))
+    return States.FOLLOWED_EVENTS
 
 
 application: Application
@@ -292,6 +321,10 @@ async def main():
 
 
 if __name__ == '__main__':
+    events, messages, descriptions = set(EVENTS_TO_FOLLOW.keys()), set(EVENT_MESSAGES.keys()), set(EVENT_DESCRIPTIONS.keys())
+    assert events == messages, "Missed events: " + str(events.symmetric_difference(messages))
+    assert events == descriptions, "Missed events: " + str(events.symmetric_difference(descriptions))
+
     storage_path = Path(os.getenv("FILESTORAGE_PATH", ".storage"))
     if not storage_path.exists():
         storage_path.mkdir(parents=True)
@@ -313,6 +346,7 @@ if __name__ == '__main__':
             States.WELCOME: [
                 CallbackQueryHandler(follow_node_operator, pattern="^" + Callback.FOLLOW_TO_NODE_OPERATOR + "$"),
                 CallbackQueryHandler(unfollow_node_operator, pattern="^" + Callback.UNFOLLOW_FROM_NODE_OPERATOR + "$"),
+                CallbackQueryHandler(followed_events, pattern="^" + Callback.FOLLOWED_EVENTS + "$"),
             ],
             States.FOLLOW_NODE_OPERATOR: [
                 CallbackQueryHandler(start_over, pattern="^" + Callback.BACK + "$"),
@@ -321,6 +355,9 @@ if __name__ == '__main__':
             States.UNFOLLOW_NODE_OPERATOR: [
                 CallbackQueryHandler(start_over, pattern="^" + Callback.BACK + "$"),
                 MessageHandler(filters.TEXT, unfollow_node_operator_message),
+            ],
+            States.FOLLOWED_EVENTS: [
+                CallbackQueryHandler(start_over, pattern="^" + Callback.BACK + "$"),
             ],
         },
         fallbacks=[CommandHandler("start", start)],
@@ -335,3 +372,4 @@ if __name__ == '__main__':
     application.add_handler(TypeHandler(Event, subscription.handle_event_log, block=False))
 
     asyncio.run(main())
+
