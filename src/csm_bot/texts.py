@@ -21,7 +21,7 @@ EVENT_DESCRIPTIONS = {
     "ELRewardsStealingPenaltyReported": "- 🚨 Penalty for stealing EL rewards reported",
     "ELRewardsStealingPenaltySettled": "- 🚨 EL rewards stealing penalty confirmed and applied",
     "ELRewardsStealingPenaltyCancelled": "- 😮‍💨 Cancelled penalty for stealing EL rewards",
-    "InitialSlashingSubmitted": "- 😱 Initial slashing submitted for one of the validators",
+    "InitialSlashingSubmitted": "- 🚨 Initial slashing submitted for one of the validators",
     "KeyRemovalChargeApplied": "- 🔑 Applied charge for key removal",
     "NodeOperatorManagerAddressChangeProposed": "- ℹ️ New manager address proposed",
     "NodeOperatorManagerAddressChanged": "- ✅ Manager address changed",
@@ -40,11 +40,11 @@ EVENT_LIST_TEXT = markdown(
     "Here is the list of events you will receive notifications for:", nl(1),
     "A 🚨 means urgent action is required from you", nl(),
     Bold("Key Management Events:"), nl(1), "Changes related to keys and their status.", nl(1),
+    EVENT_DESCRIPTIONS["VettedSigningKeysCountDecreased"], nl(1),
+    EVENT_DESCRIPTIONS["StuckSigningKeysCountChanged"], nl(),
     EVENT_DESCRIPTIONS["DepositedSigningKeysCountChanged"], nl(1),
     EVENT_DESCRIPTIONS["TotalSigningKeysCountChanged"], nl(1),
-    EVENT_DESCRIPTIONS["VettedSigningKeysCountDecreased"], nl(1),
     EVENT_DESCRIPTIONS["KeyRemovalChargeApplied"], nl(1),
-    EVENT_DESCRIPTIONS["StuckSigningKeysCountChanged"], nl(),
     Bold("Address and Reward Changes:"), nl(1), "Changes or proposals regarding management and reward addresses.", nl(1),
     EVENT_DESCRIPTIONS["NodeOperatorManagerAddressChangeProposed"], nl(1),
     EVENT_DESCRIPTIONS["NodeOperatorManagerAddressChanged"], nl(1),
@@ -114,7 +114,7 @@ def el_rewards_stealing_penalty_settled(burnt):
 
 @RegisterEventMessage("InitialSlashingSubmitted")
 def initial_slashing_submitted(key, key_url):
-    return markdown("😱 ", Bold("Initial slashing submitted for one of the validators"), nl(),
+    return markdown("🚨 ", Bold("Initial slashing submitted for one of the validators"), nl(),
                     "Slashed key: ", TextLink(key, url=key_url), nl(1),
                     "See the ", TextLink("guide", url="https://docs.lido.fi/staking-modules/csm/guides/slashing"),
                     " for more details")
@@ -129,7 +129,8 @@ def key_removal_charge_applied(amount):
 @RegisterEventMessage("NodeOperatorManagerAddressChangeProposed")
 def node_operator_manager_address_change_proposed(address):
     return markdown("ℹ️ ", Bold("New manager address proposed"), nl(),
-                    "Proposed address: ", Code(address))
+                    "Proposed address: ", Code(address), nl(1),
+                    "To complete the change, the Node Operator must confirm it from the new address.")
 
 
 @RegisterEventMessage("NodeOperatorManagerAddressChanged")
@@ -141,7 +142,8 @@ def node_operator_manager_address_changed(address):
 @RegisterEventMessage("NodeOperatorRewardAddressChangeProposed")
 def node_operator_reward_address_change_proposed(address):
     return markdown("ℹ️ ", Bold("New rewards address proposed"), nl(),
-                    "Proposed address: ", Code(address))
+                    "Proposed address: ", Code(address),
+                    "To complete the change, the Node Operator must confirm it from the new address.")
 
 
 @RegisterEventMessage("NodeOperatorRewardAddressChanged")
