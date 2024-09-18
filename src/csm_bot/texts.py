@@ -2,27 +2,9 @@ import os
 
 from aiogram.utils.formatting import Text, Bold, TextLink, Code
 
-EVENT_MESSAGES = {}
-EVENT_DESCRIPTIONS = {
-    "DepositedSigningKeysCountChanged": "🤩 Node Operator's keys received deposits",
-    "ELRewardsStealingPenaltyReported": "🚨 Penalty for stealing EL rewards reported",
-    "ELRewardsStealingPenaltySettled": "🚨 EL rewards stealing penalty confirmed and applied",
-    "ELRewardsStealingPenaltyCancelled": "😮‍💨 Cancelled penalty for stealing EL rewards",
-    "InitialSlashingSubmitted": "😱 Initial slashing submitted for one of the validators",
-    "KeyRemovalChargeApplied": "🔑 Applied charge for key removal",
-    "NodeOperatorManagerAddressChangeProposed": "ℹ️ New manager address proposed",
-    "NodeOperatorManagerAddressChanged": "✅ Manager address changed",
-    "NodeOperatorRewardAddressChangeProposed": "ℹ️ New rewards address proposed",
-    "NodeOperatorRewardAddressChanged": "✅ Rewards address changed",
-    "StuckSigningKeysCountChanged": "🚨 Reported stuck keys that were not exited in time",
-    "VettedSigningKeysCountDecreased": "🚨 Uploaded invalid keys",
-    "WithdrawalSubmitted": "👀 Key withdrawal information submitted",
-    "TotalSigningKeysCountChanged": "👀 New keys uploaded or removed",
-    "ValidatorExitRequest": "🚨 One of the validators requested to exit",
-    "PublicRelease": "🎉 Public release of CSM!",
-    "DistributionDataUpdated": "📈 New rewards distributed"
-}
-
+markdown = lambda *args, **kwargs: Text(*args, **kwargs).as_markdown()
+nl = lambda x=2: "\n" * x
+header = lambda x: f"*{x}*\n\n"
 
 class RegisterEventMessage:
     def __init__(self, event_name):
@@ -33,9 +15,54 @@ class RegisterEventMessage:
         return func
 
 
-markdown = lambda *args, **kwargs: Text(*args, **kwargs).as_markdown()
-header = lambda x: f"*{x}*\n\n"
-nl = lambda x=2: "\n" * x
+EVENT_MESSAGES = {}
+EVENT_DESCRIPTIONS = {
+    "DepositedSigningKeysCountChanged": "- 🤩 Node Operator's keys received deposits",
+    "ELRewardsStealingPenaltyReported": "- 🚨 Penalty for stealing EL rewards reported",
+    "ELRewardsStealingPenaltySettled": "- 🚨 EL rewards stealing penalty confirmed and applied",
+    "ELRewardsStealingPenaltyCancelled": "- 😮‍💨 Cancelled penalty for stealing EL rewards",
+    "InitialSlashingSubmitted": "- 😱 Initial slashing submitted for one of the validators",
+    "KeyRemovalChargeApplied": "- 🔑 Applied charge for key removal",
+    "NodeOperatorManagerAddressChangeProposed": "- ℹ️ New manager address proposed",
+    "NodeOperatorManagerAddressChanged": "- ✅ Manager address changed",
+    "NodeOperatorRewardAddressChangeProposed": "- ℹ️ New rewards address proposed",
+    "NodeOperatorRewardAddressChanged": "- ✅ Rewards address changed",
+    "StuckSigningKeysCountChanged": "- 🚨 Reported stuck keys that were not exited in time",
+    "VettedSigningKeysCountDecreased": "- 🚨 Uploaded invalid keys",
+    "WithdrawalSubmitted": "- 👀 Key withdrawal information submitted",
+    "TotalSigningKeysCountChanged": "- 👀 New keys uploaded or removed",
+    "ValidatorExitRequest": "- 🚨 One of the validators requested to exit",
+    "PublicRelease": "- 🎉 Public release of CSM!",
+    "DistributionDataUpdated": "- 📈 New rewards distributed"
+}
+
+EVENT_LIST_TEXT = markdown(
+    "Here is the list of events you will receive notifications for:", nl(1),
+    "A 🚨 means urgent action is required from you", nl(),
+    Bold("Key Management Events:"), nl(1), "Changes related to keys and their status.", nl(1),
+    EVENT_DESCRIPTIONS["DepositedSigningKeysCountChanged"], nl(1),
+    EVENT_DESCRIPTIONS["TotalSigningKeysCountChanged"], nl(1),
+    EVENT_DESCRIPTIONS["VettedSigningKeysCountDecreased"], nl(1),
+    EVENT_DESCRIPTIONS["KeyRemovalChargeApplied"], nl(1),
+    EVENT_DESCRIPTIONS["StuckSigningKeysCountChanged"], nl(),
+    Bold("Address and Reward Changes:"), nl(1), "Changes or proposals regarding management and reward addresses.", nl(1),
+    EVENT_DESCRIPTIONS["NodeOperatorManagerAddressChangeProposed"], nl(1),
+    EVENT_DESCRIPTIONS["NodeOperatorManagerAddressChanged"], nl(1),
+    EVENT_DESCRIPTIONS["NodeOperatorRewardAddressChangeProposed"], nl(1),
+    EVENT_DESCRIPTIONS["NodeOperatorRewardAddressChanged"], nl(),
+    Bold("Slashing and Stealing Events:"), nl(1), "Alerts for validator status and MEV stealing penalties.", nl(1),
+    EVENT_DESCRIPTIONS["InitialSlashingSubmitted"], nl(1),
+    EVENT_DESCRIPTIONS["ELRewardsStealingPenaltyReported"], nl(1),
+    EVENT_DESCRIPTIONS["ELRewardsStealingPenaltySettled"], nl(1),
+    EVENT_DESCRIPTIONS["ELRewardsStealingPenaltyCancelled"], nl(),
+    Bold("Withdrawal and Exit Requests:"), nl(1), "Notifications for exit requests and confirmation of exits.", nl(1),
+    EVENT_DESCRIPTIONS["ValidatorExitRequest"], nl(1),
+    EVENT_DESCRIPTIONS["WithdrawalSubmitted"], nl(),
+    Bold("Common CSM Events for all the Node Operators:"), nl(1),
+    EVENT_DESCRIPTIONS["DistributionDataUpdated"], nl(1),
+    EVENT_DESCRIPTIONS["PublicRelease"], nl(),
+)
+
 
 WELCOME_TEXT = ("Welcome to the CSM Sentinel! " + nl() +
                 "Here you can follow Node Operators and receive notifications about their events." + nl() +
