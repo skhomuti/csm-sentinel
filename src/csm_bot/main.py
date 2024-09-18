@@ -24,7 +24,7 @@ from csm_bot.texts import (
     UNFOLLOW_NODE_OPERATOR_TEXT, UNFOLLOW_NODE_OPERATOR_NOT_FOLLOWING,
     NODE_OPERATOR_FOLLOWED, NODE_OPERATOR_UNFOLLOWED, UNFOLLOW_NODE_OPERATOR_FOLLOWING, FOLLOW_NODE_OPERATOR_FOLLOWING,
     WELCOME_TEXT, NODE_OPERATOR_CANT_UNFOLLOW, NODE_OPERATOR_CANT_FOLLOW, EVENT_MESSAGES, EVENT_DESCRIPTIONS,
-    BUTTON_BACK, START_BUTTON_EVENTS,
+    BUTTON_BACK, START_BUTTON_EVENTS, EVENT_LIST_TEXT,
 )
 
 logging.basicConfig(
@@ -176,7 +176,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=text,
-        reply_markup=reply_markup
+        reply_markup=reply_markup,
     )
     return States.WELCOME
 
@@ -227,10 +227,12 @@ async def follow_node_operator_message(update: Update, context: ContextTypes.DEF
     if node_operator_id.startswith("#"):
         node_operator_id = message.text[1:]
     # TODO provider should be a separate instance
-    if node_operator_id.isdigit() and await eventMessages.csm.functions.getNodeOperatorsCount().call() >= int(node_operator_id):
+    if node_operator_id.isdigit() and await eventMessages.csm.functions.getNodeOperatorsCount().call() >= int(
+            node_operator_id):
         context.bot_data["no_ids_to_chats"][node_operator_id].add(message.chat_id)
         context.chat_data.setdefault("node_operators", set()).add(node_operator_id)
-        await message.reply_text(NODE_OPERATOR_FOLLOWED.format(node_operator_id), reply_markup=InlineKeyboardMarkup([keyboard]))
+        await message.reply_text(NODE_OPERATOR_FOLLOWED.format(node_operator_id),
+                                 reply_markup=InlineKeyboardMarkup([keyboard]))
         return States.FOLLOW_NODE_OPERATOR
     else:
         await message.reply_text(NODE_OPERATOR_CANT_FOLLOW, reply_markup=InlineKeyboardMarkup([keyboard]))
@@ -268,7 +270,8 @@ async def unfollow_node_operator_message(update: Update, context: ContextTypes.D
         node_operator_ids.remove(node_operator_id)
         context.chat_data['node_operators'] = node_operator_ids
         context.bot_data["no_ids_to_chats"][node_operator_id].remove(message.chat_id)
-        await message.reply_text(NODE_OPERATOR_UNFOLLOWED.format(node_operator_id), reply_markup=InlineKeyboardMarkup([keyboard]))
+        await message.reply_text(NODE_OPERATOR_UNFOLLOWED.format(node_operator_id),
+                                 reply_markup=InlineKeyboardMarkup([keyboard]))
         return States.UNFOLLOW_NODE_OPERATOR
     else:
         await message.reply_text(NODE_OPERATOR_CANT_UNFOLLOW, reply_markup=InlineKeyboardMarkup([keyboard]))
@@ -282,10 +285,11 @@ async def followed_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)
     ]
-    text = "Here is the list of events you will receive notifications for:\n"
-    for description in EVENT_DESCRIPTIONS.values():
-        text += f"- {description}\n"
-    await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup([keyboard]))
+    await query.edit_message_text(
+        text=EVENT_LIST_TEXT,
+        parse_mode=ParseMode.MARKDOWN_V2,
+        reply_markup=InlineKeyboardMarkup([keyboard])
+    )
     return States.FOLLOWED_EVENTS
 
 
@@ -321,7 +325,8 @@ async def main():
 
 
 if __name__ == '__main__':
-    events, messages, descriptions = set(EVENTS_TO_FOLLOW.keys()), set(EVENT_MESSAGES.keys()), set(EVENT_DESCRIPTIONS.keys())
+    events, messages, descriptions = set(EVENTS_TO_FOLLOW.keys()), set(EVENT_MESSAGES.keys()), set(
+        EVENT_DESCRIPTIONS.keys())
     assert events == messages, "Missed events: " + str(events.symmetric_difference(messages))
     assert events == descriptions, "Missed events: " + str(events.symmetric_difference(descriptions))
 
@@ -372,4 +377,3 @@ if __name__ == '__main__':
     application.add_handler(TypeHandler(Event, subscription.handle_event_log, block=False))
 
     asyncio.run(main())
-
