@@ -3,6 +3,25 @@ import os
 from aiogram.utils.formatting import Text, Bold, TextLink, Code
 
 EVENT_MESSAGES = {}
+EVENT_DESCRIPTIONS = {
+    "DepositedSigningKeysCountChanged": "🤩 Node Operator's keys received deposits",
+    "ELRewardsStealingPenaltyReported": "🚨 Penalty for stealing EL rewards reported",
+    "ELRewardsStealingPenaltySettled": "🚨 EL rewards stealing penalty confirmed and applied",
+    "ELRewardsStealingPenaltyCancelled": "😮‍💨 Cancelled penalty for stealing EL rewards",
+    "InitialSlashingSubmitted": "😱 Initial slashing submitted for one of the validators",
+    "KeyRemovalChargeApplied": "🔑 Applied charge for key removal",
+    "NodeOperatorManagerAddressChangeProposed": "ℹ️ New manager address proposed",
+    "NodeOperatorManagerAddressChanged": "✅ Manager address changed",
+    "NodeOperatorRewardAddressChangeProposed": "ℹ️ New rewards address proposed",
+    "NodeOperatorRewardAddressChanged": "✅ Rewards address changed",
+    "StuckSigningKeysCountChanged": "🚨 Reported stuck keys that were not exited in time",
+    "VettedSigningKeysCountDecreased": "🚨 Uploaded invalid keys",
+    "WithdrawalSubmitted": "👀 Key withdrawal information submitted",
+    "TotalSigningKeysCountChanged": "👀 New keys uploaded or removed",
+    "ValidatorExitRequest": "🚨 One of the validators requested to exit",
+    "PublicRelease": "🎉 Public release of CSM!",
+    "DistributionDataUpdated": "📈 New rewards distributed"
+}
 
 
 class RegisterEventMessage:
@@ -18,14 +37,15 @@ markdown = lambda *args, **kwargs: Text(*args, **kwargs).as_markdown()
 header = lambda x: f"*{x}*\n\n"
 nl = lambda x=2: "\n" * x
 
-WELCOME_TEXT = ("Welcome to the CSM Sentinel! "
-                "Here you can follow Node Operators and receive notifications about their events.")
+WELCOME_TEXT = ("Welcome to the CSM Sentinel! " + nl() +
+                "Here you can follow Node Operators and receive notifications about their events." + nl() +
+                "To get started, please use the buttons below." + nl())
 START_BUTTON_FOLLOW = "Follow"
 START_BUTTON_UNFOLLOW = "Unfollow"
-FOLLOW_NODE_OPERATOR_BACK = "Back"
+START_BUTTON_EVENTS = "Events"
+BUTTON_BACK = "Back"
 FOLLOW_NODE_OPERATOR_TEXT = "Please enter the Node Operator id you want to follow:"
 FOLLOW_NODE_OPERATOR_FOLLOWING = "Node Operators you are following: {}" + nl()
-UNFOLLOW_NODE_OPERATOR_BACK = "Back"
 UNFOLLOW_NODE_OPERATOR_TEXT = "Please enter the Node Operator id you want to unfollow:"
 UNFOLLOW_NODE_OPERATOR_NOT_FOLLOWING = "You are not following any Node Operators."
 UNFOLLOW_NODE_OPERATOR_FOLLOWING = "Node Operators you are following: {}" + nl()
