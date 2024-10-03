@@ -188,6 +188,8 @@ def total_signing_keys_count_changed(count, count_before):
 def validator_exit_request(key, key_url, request_date, exit_until):
     return markdown("🚨 ", Bold("Validator exit requested"), nl(),
                     "Make sure to exit the key before ", exit_until, nl(1),
+                    "Check the ", TextLink("Exiting CSM validators", url="https://dvt-homestaker.stakesaurus.com/bonded-validators-setup/lido-csm/exiting-csm-validators"),
+                    "guide for more details", nl(1),
                     "Requested key: ", TextLink(key, url=key_url), nl(1),
                     "Request date: ", Code(request_date))
 
