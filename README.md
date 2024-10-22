@@ -2,21 +2,31 @@
 
 CSM Sentinel is a telegram bot that sends you notifications for your CSM Node Operator events.
 
-## Instances
-At the moment, only Holesky instance is available. Check it out [here](https://t.me/CSMSentinelHolesky_bot).
+## Public Instances
+These bots are owned by @skhomuti: [Ethereum](https://t.me/CSMSentinel_bot) and [Holesky](https://t.me/CSMSentinelHolesky_bot) 
+
 Please note that no guarantee is given for the availability of the bot.
+Also consider privacy concerns when using a public instance.
 
 ## Running your own instance 
 
 First, you need to create a bot on Telegram. You can do this by talking to the [BotFather](https://t.me/botfather).
 
-Then, you need to create a `.env` by copying the `env.example.holesky` file and filling in the required fields:
-- TOKEN: The token you received from the BotFather
-- WEB3_SOCKET_PROVIDER: The websocket provider for your node
+Then, you need to create a `.env` by copying one of the `env.example.ethereum` or `env.example.holesky` files and filling in the required fields:
+- `TOKEN`: The token you received from the BotFather
+- `WEB3_SOCKET_PROVIDER`: The websocket provider for your node. 
+Preferably, use your own local node e.g. you already have for CSM validators.
+But it is also possible to use a public node of any web3 providers.
 
-All the other fields are pre-filled with the Holesky instance values.
+All other fields are pre-filled with the contracts from the corresponding network.
 
-Next, run the CSM Watcher using Docker:
+Run the CSM Sentinel using Docker compose:
+
+```bash
+docker compose up -d
+```
+
+Or using Docker:
 
 ```bash
 docker build -t csm-sentinel .
