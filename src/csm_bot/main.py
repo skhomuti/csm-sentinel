@@ -231,8 +231,8 @@ async def follow_node_operator_message(update: Update, context: ContextTypes.DEF
     if node_operator_id.startswith("#"):
         node_operator_id = message.text[1:]
     # TODO provider should be a separate instance
-    if node_operator_id.isdigit() and await eventMessages.csm.functions.getNodeOperatorsCount().call() >= int(
-            node_operator_id):
+    node_operators_count = await eventMessages.csm.functions.getNodeOperatorsCount().call()
+    if node_operator_id.isdigit() and int(node_operator_id) < node_operators_count:
         context.bot_data["no_ids_to_chats"][node_operator_id].add(message.chat_id)
         context.chat_data.setdefault("node_operators", set()).add(node_operator_id)
         await message.reply_text(NODE_OPERATOR_FOLLOWED.format(node_operator_id),
