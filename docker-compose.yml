@@ -1,9 +1,6 @@
-version: '3.8'
-
 services:
   csm-sentinel:
     build: .
-    container_name: csm-sentinel
     env_file: .env
     volumes:
       - csm-sentinel-persistence:/app/.storage
