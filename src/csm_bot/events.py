@@ -39,7 +39,8 @@ class EventMessages:
 
     async def get_event_message(self, event: Event):
         callback = EVENTS_TO_FOLLOW.get(event.event, self.default)
-        return await callback(self, event)
+        async with self.w3:
+            return await callback(self, event)
 
     @staticmethod
     def footer(event: Event):

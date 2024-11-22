@@ -11,7 +11,7 @@ from web3._utils.events import get_event_data
 from web3._utils.filters import construct_event_filter_params
 from web3.types import EventData
 from web3.utils.abi import get_event_abi
-from websockets import ConnectionClosedError, ConnectionClosedOK
+from websockets import ConnectionClosed
 
 from csm_bot.events import EVENTS_TO_FOLLOW
 from csm_bot.models import Event, Block, CSM_ABI, VEBO_ABI, FEE_DISTRIBUTOR_ABI
@@ -61,7 +61,7 @@ class Subscription:
             while True:
                 try:
                     return await func(self, *args, **kwargs)
-                except (ConnectionClosedError, ConnectionClosedOK):
+                except ConnectionClosed:
                     if self._shutdown_event.is_set():
                         break
                     logger.info("Web3 provider disconnected, reconnecting...")

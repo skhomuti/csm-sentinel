@@ -36,6 +36,8 @@ logging.basicConfig(
 logging.getLogger('httpx').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
+logging.getLogger('web3.providers.WebSocketProvider').setLevel(logging.WARNING)
+
 
 class States:
     WELCOME = "1"
@@ -235,7 +237,8 @@ async def follow_node_operator_message(update: Update, context: ContextTypes.DEF
     if node_operator_id.startswith("#"):
         node_operator_id = message.text[1:]
     # TODO provider should be a separate instance
-    node_operators_count = await eventMessages.csm.functions.getNodeOperatorsCount().call()
+    async with rpc_provider:
+        node_operators_count = await eventMessages.csm.functions.getNodeOperatorsCount().call()
     if node_operator_id.isdigit() and int(node_operator_id) < node_operators_count:
         context.bot_data["no_ids_to_chats"][node_operator_id].add(message.chat_id)
         context.chat_data.setdefault("node_operators", set()).add(node_operator_id)
@@ -365,9 +368,10 @@ if __name__ == '__main__':
         .rate_limiter(AIORateLimiter(max_retries=5))
         .build()
     )
-    provider = AsyncWeb3(WebSocketProvider(os.getenv("WEB3_SOCKET_PROVIDER"), max_connection_retries=-1))
-    subscription = TelegramSubscription(provider, application)
-    eventMessages = EventMessages(provider)
+    persistent_provider = AsyncWeb3(WebSocketProvider(os.getenv("WEB3_SOCKET_PROVIDER"), max_connection_retries=-1))
+    rpc_provider = AsyncWeb3(WebSocketProvider(os.getenv("WEB3_SOCKET_PROVIDER"), max_connection_retries=-1))
+    subscription = TelegramSubscription(persistent_provider, application)
+    eventMessages = EventMessages(rpc_provider)
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
