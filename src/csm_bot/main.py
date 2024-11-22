@@ -5,6 +5,8 @@ from collections import defaultdict
 from itertools import chain
 from pathlib import Path
 
+import httpx
+import telegram.error
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions, Chat, ChatMemberUpdated,
     ChatMember,
@@ -60,7 +62,7 @@ class TelegramSubscription(Subscription):
         await application.update_queue.put(event)
 
     async def handle_event_log(self, event: Event, context: ContextTypes.DEFAULT_TYPE):
-        logger.info("Handle event on the block %s: %s %s", event.block, event.event, event.args)
+        logger.info("Handle event on the block %s: %s", event.block, event.readable())
         actual_chat_ids = (context.bot_data.get("user_ids", set())
                            .union(context.bot_data.get("group_ids", set()))
                            .union(context.bot_data.get("channel_ids", set())))
@@ -78,6 +80,8 @@ class TelegramSubscription(Subscription):
                                            text=message,
                                            parse_mode=ParseMode.MARKDOWN_V2,
                                            link_preview_options=LinkPreviewOptions(is_disabled=True))
+        if chats:
+            logger.info("Messages sent: %s", len(chats))
 
     async def process_new_block(self, block: Block):
         await application.update_queue.put(block)
@@ -297,6 +301,21 @@ async def followed_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return States.FOLLOWED_EVENTS
 
 
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update is None:
+        logger.error("A %s occurred: %s", context.error.__class__.__name__, context.error)
+    else:
+        logger.error("Update %s caused error %s", update, context.error)
+
+
+def error_callback(error: Exception) -> None:
+    """
+    Suppress error tracebacks that are possibly not affecting the user experience.
+    """
+    if isinstance(error, (telegram.error.Conflict, httpx.ReadError)):
+        application.create_task(application.process_error(update=None, error=error))
+
+
 application: Application
 subscription: TelegramSubscription
 eventMessages: EventMessages
@@ -305,6 +324,7 @@ eventMessages: EventMessages
 async def main():
     await application.initialize()
     await application.start()
+    application.add_error_handler(error_handler)
     if "no_ids_to_chats" not in application.bot_data:
         application.bot_data["no_ids_to_chats"] = defaultdict(set)
     if "block" not in application.bot_data:
@@ -312,7 +332,7 @@ async def main():
     logger.info("Bot started. Latest processed block number: %s", application.bot_data.get('block'))
 
     try:
-        await application.updater.start_polling()
+        await application.updater.start_polling(error_callback=error_callback)
 
         subscription.setup_signal_handlers(asyncio.get_running_loop())
         if application.bot_data.get('block') != 0:

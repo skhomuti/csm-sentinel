@@ -6,6 +6,7 @@ markdown = lambda *args, **kwargs: Text(*args, **kwargs).as_markdown()
 nl = lambda x=2: "\n" * x
 header = lambda x: f"*{x}*\n\n"
 
+
 class RegisterEventMessage:
     def __init__(self, event_name):
         self.event_name = event_name
@@ -45,7 +46,8 @@ EVENT_LIST_TEXT = markdown(
     EVENT_DESCRIPTIONS["DepositedSigningKeysCountChanged"], nl(1),
     EVENT_DESCRIPTIONS["TotalSigningKeysCountChanged"], nl(1),
     EVENT_DESCRIPTIONS["KeyRemovalChargeApplied"], nl(),
-    Bold("Address and Reward Changes:"), nl(1), "Changes or proposals regarding management and reward addresses.", nl(1),
+    Bold("Address and Reward Changes:"), nl(1), "Changes or proposals regarding management and reward addresses.",
+    nl(1),
     EVENT_DESCRIPTIONS["NodeOperatorManagerAddressChangeProposed"], nl(1),
     EVENT_DESCRIPTIONS["NodeOperatorManagerAddressChanged"], nl(1),
     EVENT_DESCRIPTIONS["NodeOperatorRewardAddressChangeProposed"], nl(1),
@@ -62,7 +64,6 @@ EVENT_LIST_TEXT = markdown(
     EVENT_DESCRIPTIONS["DistributionDataUpdated"], nl(1),
     EVENT_DESCRIPTIONS["PublicRelease"], nl(),
 )
-
 
 WELCOME_TEXT = ("Welcome to the CSM Sentinel! " + nl() +
                 "Here you can follow Node Operators and receive notifications about their events." + nl() +
@@ -188,8 +189,9 @@ def total_signing_keys_count_changed(count, count_before):
 def validator_exit_request(key, key_url, request_date, exit_until):
     return markdown("🚨 ", Bold("Validator exit requested"), nl(),
                     "Make sure to exit the key before ", exit_until, nl(1),
-                    "Check the ", TextLink("Exiting CSM validators", url="https://dvt-homestaker.stakesaurus.com/bonded-validators-setup/lido-csm/exiting-csm-validators"),
-                    "guide for more details", nl(1),
+                    "Check the ", TextLink("Exiting CSM validators",
+                                           url="https://dvt-homestaker.stakesaurus.com/bonded-validators-setup/lido-csm/exiting-csm-validators"),
+                    " guide for more details", nl(1),
                     "Requested key: ", TextLink(key, url=key_url), nl(1),
                     "Request date: ", Code(request_date))
 
