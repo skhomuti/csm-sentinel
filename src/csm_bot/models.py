@@ -26,3 +26,7 @@ class Event:
     args: dict
     block: int
     tx: HexBytes
+
+    def readable(self):
+        args = ", ".join(f"{key}={value}" for key, value in self.args.items())
+        return f"{self.event}({args})"
