@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import os
 
@@ -15,6 +16,27 @@ from csm_bot.texts import EVENT_MESSAGES, EVENT_MESSAGE_FOOTER, EVENT_MESSAGE_FO
 EVENTS_TO_FOLLOW = {}
 
 
+class ConnectOnDemand:
+    connected_clients = 0
+
+    def __init__(self, provider: AsyncWeb3):
+        self._provider = provider
+        self._lock = asyncio.Lock()
+
+    async def __aenter__(self):
+        async with self._lock:
+            self.connected_clients += 1
+            if not await self._provider.provider.is_connected():
+                await self._provider.provider.connect()
+            return self._provider
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        async with self._lock:
+            self.connected_clients -= 1
+            if await self._provider.provider.is_connected() and self.connected_clients == 0:
+                await self._provider.provider.disconnect()
+
+
 def _format_date(date: datetime.datetime):
     return date.strftime("%a %d %b %Y, %I:%M%p UTC")
 
@@ -30,6 +52,7 @@ class RegisterEvent:
 
 class EventMessages:
     def __init__(self, w3: AsyncWeb3):
+        self.connectProvider = ConnectOnDemand(w3)
         self.w3 = w3
         self.csm = self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_ABI, decode_tuples=True)
         self.accounting = self.w3.eth.contract(address=os.getenv("ACCOUNTING_ADDRESS"), abi=ACCOUNTING_ABI, decode_tuples=True)
@@ -39,7 +62,7 @@ class EventMessages:
 
     async def get_event_message(self, event: Event):
         callback = EVENTS_TO_FOLLOW.get(event.event, self.default)
-        async with self.w3:
+        async with self.connectProvider:
             return await callback(self, event)
 
     @staticmethod
