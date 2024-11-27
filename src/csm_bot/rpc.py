@@ -127,23 +127,25 @@ class Subscription:
             logger.info("No blocks to process")
             return
         logger.info(f"Processing blocks from %s to %s", start_block, current_block)
-        filter_params = {
-            "fromBlock": start_block,
-            "toBlock": current_block,
-            "address": os.getenv("CSM_ADDRESS"),
-        }
-        logs = await w3.eth.get_logs(filter_params)
-        for log in logs:
-            event_topic = log["topics"][0]
-            event_abi = self.abi_by_topics.get(event_topic)
-            if not event_abi:
-                continue
-            event_data: EventData = get_event_data(w3.codec, event_abi, log)
-            await self.process_event_log(Event(event=event_data["event"],
-                                               args=event_data["args"],
-                                               block=event_data["blockNumber"],
-                                               tx=event_data["transactionHash"]))
-            await asyncio.sleep(0)
+        # TODO add vebo address
+        for contract in [os.getenv("CSM_ADDRESS"), os.getenv("FEE_DISTRIBUTOR_ADDRESS")]:
+            filter_params = {
+                "fromBlock": start_block,
+                "toBlock": current_block,
+                "address": contract,
+            }
+            logs = await w3.eth.get_logs(filter_params)
+            for log in logs:
+                event_topic = log["topics"][0]
+                event_abi = self.abi_by_topics.get(event_topic)
+                if not event_abi:
+                    continue
+                event_data: EventData = get_event_data(w3.codec, event_abi, log)
+                await self.process_event_log(Event(event=event_data["event"],
+                                                   args=event_data["args"],
+                                                   block=event_data["blockNumber"],
+                                                   tx=event_data["transactionHash"]))
+                await asyncio.sleep(0)
         await self.process_new_block(Block(number=current_block))
 
     async def process_event_log(self, event: Event):
