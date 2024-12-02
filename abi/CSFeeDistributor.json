@@ -58,6 +58,11 @@
   },
   {
     "inputs": [],
+    "name": "InvalidLogCID",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidProof",
     "type": "error"
   },
@@ -144,6 +149,19 @@
       }
     ],
     "name": "DistributionDataUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "logCid",
+        "type": "string"
+      }
+    ],
+    "name": "DistributionLogUpdated",
     "type": "event"
   },
   {
@@ -657,6 +675,19 @@
   },
   {
     "inputs": [],
+    "name": "logCid",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "pendingSharesToDistribute",
     "outputs": [
       {
@@ -678,6 +709,11 @@
       {
         "internalType": "string",
         "name": "_treeCid",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "_logCid",
         "type": "string"
       },
       {
