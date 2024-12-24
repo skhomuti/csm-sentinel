@@ -1,6 +1,7 @@
 import os
 
 from aiogram.utils.formatting import Text, Bold, TextLink, Code
+from web3.constants import ADDRESS_ZERO
 
 markdown = lambda *args, **kwargs: Text(*args, **kwargs).as_markdown()
 nl = lambda x=2: "\n" * x
@@ -129,9 +130,12 @@ def key_removal_charge_applied(amount):
 
 @RegisterEventMessage("NodeOperatorManagerAddressChangeProposed")
 def node_operator_manager_address_change_proposed(address):
-    return markdown("ℹ️ ", Bold("New manager address proposed"), nl(),
-                    "Proposed address: ", Code(address), nl(1),
-                    "To complete the change, the Node Operator must confirm it from the new address.")
+    if address == ADDRESS_ZERO:
+        return markdown("ℹ️ ", Bold("Proposed manager address revoked"))
+    else:
+        return markdown("ℹ️ ", Bold("New manager address proposed"), nl(),
+                        "Proposed address: ", Code(address), nl(1),
+                        "To complete the change, the Node Operator must confirm it from the new address.")
 
 
 @RegisterEventMessage("NodeOperatorManagerAddressChanged")
@@ -142,9 +146,12 @@ def node_operator_manager_address_changed(address):
 
 @RegisterEventMessage("NodeOperatorRewardAddressChangeProposed")
 def node_operator_reward_address_change_proposed(address):
-    return markdown("ℹ️ ", Bold("New rewards address proposed"), nl(),
-                    "Proposed address: ", Code(address),
-                    "To complete the change, the Node Operator must confirm it from the new address.")
+    if address == ADDRESS_ZERO:
+        return markdown("ℹ️ ", Bold("Proposed reward address revoked"))
+    else:
+        return markdown("ℹ️ ", Bold("New rewards address proposed"), nl(),
+                        "Proposed address: ", Code(address),
+                        "To complete the change, the Node Operator must confirm it from the new address.")
 
 
 @RegisterEventMessage("NodeOperatorRewardAddressChanged")
