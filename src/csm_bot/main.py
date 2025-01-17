@@ -77,13 +77,18 @@ class TelegramSubscription(Subscription):
 
         message = await eventMessages.get_event_message(event)
 
+        sent_messages = 0
         for chat in chats:
-            await context.bot.send_message(chat_id=chat,
-                                           text=message,
-                                           parse_mode=ParseMode.MARKDOWN_V2,
-                                           link_preview_options=LinkPreviewOptions(is_disabled=True))
-        if chats:
-            logger.info("Messages sent: %s", len(chats))
+            try:
+                await context.bot.send_message(chat_id=chat,
+                                               text=message,
+                                               parse_mode=ParseMode.MARKDOWN_V2,
+                                               link_preview_options=LinkPreviewOptions(is_disabled=True))
+                sent_messages += 1
+            except Exception as e:
+                logger.error("Error sending message to chat %s: %s", chat, e)
+        if sent_messages:
+            logger.info("Messages sent: %s", sent_messages)
 
     async def process_new_block(self, block: Block):
         await application.update_queue.put(block)
