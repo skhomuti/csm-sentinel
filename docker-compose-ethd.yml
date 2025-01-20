@@ -1,0 +1,17 @@
+services:
+  csm-sentinel:
+    build: .
+    env_file: .env
+    volumes:
+      - csm-sentinel-persistence:/app/.storage
+    restart: unless-stopped
+    environment:
+      WEB3_SOCKET_PROVIDER: "ws://execution:8546"
+
+volumes:
+  csm-sentinel-persistence:
+
+networks:
+  default:
+    name: eth-docker_default
+    external: true
