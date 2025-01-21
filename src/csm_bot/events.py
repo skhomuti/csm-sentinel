@@ -175,3 +175,13 @@ class EventMessages:
     async def distribution_data_updated(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         return template() + self.footer(event)
+
+    @RegisterEvent("TargetValidatorsCountChanged")
+    async def target_validators_count_changed(self, event: Event):
+        node_operator = await self.csm.functions.getNodeOperator(event.args["nodeOperatorId"]).call(
+            block_identifier=event.block - 1)
+        mode_before = node_operator.targetLimitMode
+        limit_before = node_operator.targetLimit
+
+        template: callable = EVENT_MESSAGES.get(event.event)
+        return template(mode_before, limit_before, event.args['targetLimitMode'], event.args['targetValidatorsCount']) + self.footer(event)
