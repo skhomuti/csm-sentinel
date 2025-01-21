@@ -5,7 +5,6 @@ from web3.constants import ADDRESS_ZERO
 
 markdown = lambda *args, **kwargs: Text(*args, **kwargs).as_markdown()
 nl = lambda x=2: "\n" * x
-header = lambda x: f"*{x}*\n\n"
 
 
 class RegisterEventMessage:
@@ -35,7 +34,8 @@ EVENT_DESCRIPTIONS = {
     "TotalSigningKeysCountChanged": "- 👀 New keys uploaded or removed",
     "ValidatorExitRequest": "- 🚨 One of the validators requested to exit",
     "PublicRelease": "- 🎉 Public release of CSM!",
-    "DistributionDataUpdated": "- 📈 New rewards distributed"
+    "DistributionDataUpdated": "- 📈 New rewards distributed",
+    "TargetValidatorsCountChanged": "- 🚨 Target validators count changed",
 }
 
 EVENT_LIST_TEXT = markdown(
@@ -46,7 +46,8 @@ EVENT_LIST_TEXT = markdown(
     EVENT_DESCRIPTIONS["StuckSigningKeysCountChanged"], nl(1),
     EVENT_DESCRIPTIONS["DepositedSigningKeysCountChanged"], nl(1),
     EVENT_DESCRIPTIONS["TotalSigningKeysCountChanged"], nl(1),
-    EVENT_DESCRIPTIONS["KeyRemovalChargeApplied"], nl(),
+    EVENT_DESCRIPTIONS["KeyRemovalChargeApplied"], nl(1),
+    EVENT_DESCRIPTIONS["TargetValidatorsCountChanged"], nl(),
     Bold("Address and Reward Changes:"), nl(1), "Changes or proposals regarding management and reward addresses.",
     nl(1),
     EVENT_DESCRIPTIONS["NodeOperatorManagerAddressChangeProposed"], nl(1),
@@ -214,3 +215,32 @@ def distribution_data_updated():
     return markdown("📈 ", Bold("Rewards distributed!"), nl(),
                     "Follow the ", TextLink("CSM UI", url=os.getenv("CSM_UI_URL")),
                     " to check new claimable rewards.")
+
+
+@RegisterEventMessage("TargetValidatorsCountChanged")
+def target_validators_count_changed(mode_before, limit_before, mode_after, limit_after):
+    match (mode_before, limit_before, mode_after, limit_after):
+        case (1, _, 1, limit_after) if limit_after < limit_before:
+            return markdown("🚨 ", Bold("Target validators count changed"), nl(),
+                            f"The limit has been decreased from {limit_before} to {limit_after}.", nl(1),
+                            f"{limit_before - limit_after} more key(s) will be requested to exit first.")
+        case (2, _, 2, limit_after) if limit_after < limit_before:
+            return markdown("🚨 ", Bold("Target validators count changed"), nl(),
+                            f"The limit has been decreased from {limit_before} to {limit_after}.", nl(1),
+                            f"{limit_before - limit_after} more key(s) will be requested to exit immediately.")
+        case (_, _, 1, _):
+            return markdown("🚨 ", Bold("Target validators count changed"), nl(),
+                            f"The limit has been set to {limit_after}.", nl(1),
+                            f"{limit_after} keys will be requested to exit first.")
+        case (_, _, 2, _):
+            return markdown("🚨 ", Bold("Target validators count changed"), nl(),
+                            f"The limit has been set to {limit_after}.", nl(1),
+                            f"{limit_after} keys will be requested to exit immediately.")
+        case (_, _, 0, _):
+            return markdown("🚨 ", Bold("Target validators count changed"), nl(),
+                            "The limit has been set to zero. No keys will be requested to exit.")
+        case _:
+            # is there any case for this?
+            return markdown("🚨 ", Bold("Target validators count changed"), nl(),
+                            f"Mode changed from {mode_before} to {mode_after}.", nl(1),
+                            f"Limit changed from {limit_before} to {limit_after}.")
