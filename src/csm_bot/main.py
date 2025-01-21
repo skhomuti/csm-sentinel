@@ -337,14 +337,15 @@ async def main():
         application.bot_data["no_ids_to_chats"] = defaultdict(set)
     if "block" not in application.bot_data:
         application.bot_data["block"] = 0
-    logger.info("Bot started. Latest processed block number: %s", application.bot_data.get('block'))
+    block_from = int(os.getenv("BLOCK_FROM", application.bot_data.get('block')))
+    logger.info("Bot started. Latest processed block number: %s", block_from)
 
     try:
         await application.updater.start_polling(error_callback=error_callback)
 
         subscription.setup_signal_handlers(asyncio.get_running_loop())
-        if application.bot_data.get('block') != 0:
-            await subscription.process_blocks_from(application.bot_data.get('block'))
+        if block_from:
+            await subscription.process_blocks_from(block_from)
         await subscription.subscribe()
 
     except asyncio.CancelledError:
