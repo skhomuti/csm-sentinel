@@ -39,3 +39,10 @@ docker volume create csm-sentinel-persistent
 
 docker run -d --env-file=.env --name csm-sentinel -v csm-sentinel-persistent:/app/.storage csm-sentinel
 ```
+
+## Extra configuration
+
+Pass the `BLOCK_FROM` environment variable to specify the block the bot should start monitoring events from.
+Note that this may result in duplicate events if you set it to a block that the bot has already processed before.
+`BLOCK_FROM=0` allows you to skip processing past blocks and always start from the head.
+In general, you don't need to set this variable.
