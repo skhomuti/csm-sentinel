@@ -40,6 +40,19 @@ docker volume create csm-sentinel-persistent
 docker run -d --env-file=.env --name csm-sentinel -v csm-sentinel-persistent:/app/.storage csm-sentinel
 ```
 
+## Running alongside eth-docker
+If you are running the bot on the same machine as the [eth-docker](https://github.com/eth-educators/eth-docker), 
+you can use the execution client with no need to expose it outside the container.
+
+You need to use a special docker-compose file that connects the Sentinel instance to the eth-docker network.
+
+```bash
+docker compose -f docker-compose-ethd.yml up -d
+```
+
+`WEB3_SOCKET_PROVIDER` env variable is set to `ws://execution:8546` via docker-compose file, 
+so you don't need to specify it in the `.env` file.
+
 ## Extra configuration
 
 Pass the `BLOCK_FROM` environment variable to specify the block the bot should start monitoring events from.
