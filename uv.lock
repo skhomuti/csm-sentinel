@@ -291,11 +291,11 @@ requires-dist = [
     { name = "python-dotenv" },
     { name = "python-telegram-bot", extras = ["rate-limiter"], specifier = ">=21.4" },
     { name = "tqdm", specifier = ">=4.66.5" },
-    { name = "web3", specifier = ">=7" },
+    { name = "web3", specifier = ">=7.9" },
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest" }]
+dev = [{ name = "pytest", specifier = ">=8.3.4" }]
 
 [[package]]
 name = "cytoolz"
@@ -904,7 +904,7 @@ wheels = [
 
 [[package]]
 name = "web3"
-version = "7.0.0"
+version = "7.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -922,9 +922,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e0/67/0bd897554f8154fb3dea61474122884da5d4f561a612a4729480ef103f04/web3-7.0.0.tar.gz", hash = "sha256:a1afc7f98c1d1fc899e61549c74ef5bc3d7b03f33be66e6a4a4378342cb049de", size = 2132539 }
+sdist = { url = "https://files.pythonhosted.org/packages/5d/d7/f67b4947d89ab6a0c7a2079452e804368ebb4c36e47bfb12cf7641d93c60/web3-7.9.0.tar.gz", hash = "sha256:3c4487a7ac57e0a187bd7ee03db455d94f354d15cca45f097f15f7281ad1a01f", size = 2193782 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/85/f3/7e85bc0b96d8c16046aee0c329a9e55ba29aeeef43517cdee760e9c75fc1/web3-7.0.0-py3-none-any.whl", hash = "sha256:8434daabc4e95f63a21501e7ba7e07fd9ced9b4481e68c5ac864aa91201ac9c4", size = 1323832 },
+    { url = "https://files.pythonhosted.org/packages/ef/df/7ca4a880772a3eea99c994d40d142c96cb679e625dd4bce3cd79901e58d8/web3-7.9.0-py3-none-any.whl", hash = "sha256:7818267675283e9cae4487d2805fc34b899aa26f41b0000c798c79b1684899eb", size = 1365826 },
 ]
 
 [[package]]
