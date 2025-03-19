@@ -8,7 +8,8 @@ You can either [run the bot yourself](https://github.com/skhomuti/csm-sentinel?t
 or use the [community-supported public instance](https://github.com/skhomuti/csm-sentinel?tab=readme-ov-file#public-instances), depending on your privacy preferences.
 
 ## Public Instances
-These bots are owned by [@skhomuti](https://t.me/skhomuti): [Ethereum](https://t.me/CSMSentinel_bot) and [Holesky](https://t.me/CSMSentinelHolesky_bot) 
+These bots are owned by [@skhomuti](https://t.me/skhomuti): [Ethereum](https://t.me/CSMSentinel_bot) and [Hoodi](https://t.me/CSMSentinelHoodi_bot). 
+The [Holesky](https://t.me/CSMSentinelHolesky_bot) instance is no longer supported. 
 
 Please note that no guarantee is given for the availability of the bot.
 Also consider privacy concerns when using a public instance.
@@ -17,7 +18,7 @@ Also consider privacy concerns when using a public instance.
 
 First, you need to create a bot on Telegram. You can do this by talking to the [BotFather](https://t.me/botfather).
 
-Then, you need to create a `.env` by copying one of the `env.example.ethereum` or `env.example.holesky` files and filling in the required fields:
+Then, you need to create a `.env` by copying one of the `env.example.ethereum` or `env.example.hoodi` files and filling in the required fields:
 - `TOKEN`: The token you received from the BotFather
 - `WEB3_SOCKET_PROVIDER`: The websocket provider for your node. 
 Preferably, use your own local node e.g. you already have for CSM validators.
