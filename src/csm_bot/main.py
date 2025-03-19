@@ -19,6 +19,7 @@ from telegram.ext import (
 from web3 import AsyncWeb3, WebSocketProvider
 
 from csm_bot.events import EventMessages, EVENTS_TO_FOLLOW
+from csm_bot.jobs import JobContext
 from csm_bot.models import Block, Event
 from csm_bot.rpc import Subscription
 from csm_bot.texts import (
@@ -75,7 +76,7 @@ class TelegramSubscription(Subscription):
             chats = set(chain(*context.bot_data["no_ids_to_chats"].values()))
         chats = chats.intersection(actual_chat_ids)
 
-        message = await eventMessages.get_event_message(event)
+        message = await event_messages.get_event_message(event)
 
         sent_messages = 0
         for chat in chats:
@@ -242,8 +243,8 @@ async def follow_node_operator_message(update: Update, context: ContextTypes.DEF
     if node_operator_id.startswith("#"):
         node_operator_id = message.text[1:]
     # TODO provider should be a separate instance
-    async with eventMessages.connectProvider:
-        node_operators_count = await eventMessages.csm.functions.getNodeOperatorsCount().call()
+    async with event_messages.connectProvider:
+        node_operators_count = await event_messages.csm.functions.getNodeOperatorsCount().call()
     if node_operator_id.isdigit() and int(node_operator_id) < node_operators_count:
         context.bot_data["no_ids_to_chats"][node_operator_id].add(message.chat_id)
         context.chat_data.setdefault("node_operators", set()).add(node_operator_id)
@@ -326,8 +327,8 @@ def error_callback(error: Exception) -> None:
 
 application: Application
 subscription: TelegramSubscription
-eventMessages: EventMessages
-
+event_messages: EventMessages
+job_context: JobContext
 
 async def main():
     await application.initialize()
@@ -338,6 +339,8 @@ async def main():
     if "block" not in application.bot_data:
         application.bot_data["block"] = 0
     block_from = int(os.getenv("BLOCK_FROM", application.bot_data.get('block')))
+    await job_context.schedule(application)
+
     logger.info("Bot started. Latest processed block number: %s", block_from)
 
     try:
@@ -377,7 +380,8 @@ if __name__ == '__main__':
     persistent_provider = AsyncWeb3(WebSocketProvider(os.getenv("WEB3_SOCKET_PROVIDER"), max_connection_retries=-1))
     rpc_provider = AsyncWeb3(WebSocketProvider(os.getenv("WEB3_SOCKET_PROVIDER"), max_connection_retries=-1))
     subscription = TelegramSubscription(persistent_provider, application)
-    eventMessages = EventMessages(rpc_provider)
+    event_messages = EventMessages(rpc_provider)
+    job_context = JobContext()
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],

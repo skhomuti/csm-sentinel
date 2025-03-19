@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "web3>=7.9",
-    "python-telegram-bot[rate-limiter]>=21.4",
+    "python-telegram-bot[rate-limiter,job-queue]>=21.4",
     "python-dotenv",
     "tqdm>=4.66.5",
     "aiogram>=3.12.0",
