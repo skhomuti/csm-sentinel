@@ -1,6 +1,6 @@
 # CSM Sentinel
 
-CSM Sentinel is a telegram bot that sends you notifications for your CSM Node Operator events.
+CSM Sentinel is a Telegram bot that sends you notifications for your CSM Node Operator events.
 
 This bot was developed and is maintained by [@skhomuti](https://github.com/skhomuti), a member of the Lido Protocol community, 
 to simplify the process of [subscribing to the important events for CSM](https://docs.lido.fi/staking-modules/csm/guides/events/). 
