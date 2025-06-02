@@ -18,7 +18,7 @@ Also consider privacy concerns when using a public instance.
 
 First, you need to create a bot on Telegram. You can do this by talking to the [BotFather](https://t.me/botfather).
 
-Then, you need to create a `.env` by copying one of the `env.example.ethereum` or `env.example.hoodi` files and filling in the required fields:
+Then, you need to create a `.env` by copying one of the `.env.sample.ethereum` or `.env.sample.hoodi` files and filling in the required fields:
 - `TOKEN`: The token you received from the BotFather
 - `WEB3_SOCKET_PROVIDER`: The websocket provider for your node. 
 Preferably, use your own local node e.g. you already have for CSM validators.
