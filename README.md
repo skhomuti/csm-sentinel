@@ -60,3 +60,6 @@ Pass the `BLOCK_FROM` environment variable to specify the block the bot should s
 Note that this may result in duplicate events if you set it to a block that the bot has already processed before.
 `BLOCK_FROM=0` allows you to skip processing past blocks and always start from the head.
 In general, you don't need to set this variable.
+
+`BLOCK_BATCH_SIZE` controls how many blocks are fetched per RPC request when processing historical events.
+The default value is `10000`.
