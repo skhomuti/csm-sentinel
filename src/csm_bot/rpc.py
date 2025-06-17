@@ -110,7 +110,7 @@ class Subscription:
         if start_block == current_block:
             logger.info("No blocks to process")
             return
-        logger.info(f"Processing blocks from %s to %s", start_block, current_block)
+        logger.info("Processing blocks from %s to %s", start_block, current_block)
         batch_size = int(os.getenv("BLOCK_BATCH_SIZE", 10_000))
         for contract in [
             os.getenv("CSM_ADDRESS"),
