@@ -112,7 +112,11 @@ class Subscription:
             return
         logger.info(f"Processing blocks from %s to %s", start_block, current_block)
         batch_size = int(os.getenv("BLOCK_BATCH_SIZE", 10_000))
-        for contract in [os.getenv("CSM_ADDRESS"), os.getenv("FEE_DISTRIBUTOR_ADDRESS")]:
+        for contract in [
+            os.getenv("CSM_ADDRESS"),
+            os.getenv("FEE_DISTRIBUTOR_ADDRESS"),
+            os.getenv("VEBO_ADDRESS"),
+        ]:
             for batch_start in range(start_block, current_block + 1, batch_size):
                 batch_end = min(batch_start + batch_size - 1, current_block)
                 filter_params = FilterParams(
