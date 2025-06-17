@@ -111,27 +111,30 @@ class Subscription:
             logger.info("No blocks to process")
             return
         logger.info(f"Processing blocks from %s to %s", start_block, current_block)
+        batch_size = int(os.getenv("BLOCK_BATCH_SIZE", 10_000))
         for contract in [os.getenv("CSM_ADDRESS"), os.getenv("FEE_DISTRIBUTOR_ADDRESS")]:
-            filter_params = FilterParams(
-                fromBlock=start_block,
-                toBlock=current_block,
-                address=contract,
-            )
-            logs = await w3.eth.get_logs(filter_params)
-            for log in logs:
-                event_topic = log["topics"][0]
-                event_abi = self.abi_by_topics.get(event_topic)
-                if not event_abi:
-                    continue
-                event_data: EventData = get_event_data(w3.codec, event_abi, log)
-                event = Event(event=event_data["event"],
-                                args=event_data["args"],
-                                block=event_data["blockNumber"],
-                                tx=event_data["transactionHash"])
-                if contract == os.getenv("VEBO_ADDRESS") and not self._filter_vebo_exit_requests(event):
-                    continue
-                await self.process_event_log(event)
-                await asyncio.sleep(0)
+            for batch_start in range(start_block, current_block + 1, batch_size):
+                batch_end = min(batch_start + batch_size - 1, current_block)
+                filter_params = FilterParams(
+                    fromBlock=batch_start,
+                    toBlock=batch_end,
+                    address=contract,
+                )
+                logs = await w3.eth.get_logs(filter_params)
+                for log in logs:
+                    event_topic = log["topics"][0]
+                    event_abi = self.abi_by_topics.get(event_topic)
+                    if not event_abi:
+                        continue
+                    event_data: EventData = get_event_data(w3.codec, event_abi, log)
+                    event = Event(event=event_data["event"],
+                                    args=event_data["args"],
+                                    block=event_data["blockNumber"],
+                                    tx=event_data["transactionHash"])
+                    if contract == os.getenv("VEBO_ADDRESS") and not self._filter_vebo_exit_requests(event):
+                        continue
+                    await self.process_event_log(event)
+                    await asyncio.sleep(0)
 
         await self.process_new_block(Block(number=current_block))
 
