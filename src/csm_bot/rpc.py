@@ -112,13 +112,19 @@ class Subscription:
             return
         logger.info("Processing blocks from %s to %s", start_block, current_block)
         batch_size = int(os.getenv("BLOCK_BATCH_SIZE", 10_000))
-        for contract in [
-            os.getenv("CSM_ADDRESS"),
-            os.getenv("FEE_DISTRIBUTOR_ADDRESS"),
-            os.getenv("VEBO_ADDRESS"),
-        ]:
-            for batch_start in range(start_block, current_block + 1, batch_size):
-                batch_end = min(batch_start + batch_size - 1, current_block)
+        for batch_start in range(start_block, current_block + 1, batch_size):
+            batch_end = min(batch_start + batch_size - 1, current_block)
+            for contract in [
+                os.getenv("CSM_ADDRESS"),
+                os.getenv("FEE_DISTRIBUTOR_ADDRESS"),
+                os.getenv("VEBO_ADDRESS"),
+            ]:
+                logger.debug(
+                    "Fetching logs for %s blocks %s-%s",
+                    contract,
+                    batch_start,
+                    batch_end,
+                )
                 filter_params = FilterParams(
                     fromBlock=batch_start,
                     toBlock=batch_end,
@@ -131,16 +137,19 @@ class Subscription:
                     if not event_abi:
                         continue
                     event_data: EventData = get_event_data(w3.codec, event_abi, log)
-                    event = Event(event=event_data["event"],
-                                    args=event_data["args"],
-                                    block=event_data["blockNumber"],
-                                    tx=event_data["transactionHash"])
+                    event = Event(
+                        event=event_data["event"],
+                        args=event_data["args"],
+                        block=event_data["blockNumber"],
+                        tx=event_data["transactionHash"],
+                    )
                     if contract == os.getenv("VEBO_ADDRESS") and not self._filter_vebo_exit_requests(event):
                         continue
                     await self.process_event_log(event)
                     await asyncio.sleep(0)
+            await self.process_new_block(Block(number=batch_end))
+            logger.debug("Processed blocks up to %s", batch_end)
 
-        await self.process_new_block(Block(number=current_block))
 
     async def _handle_new_block_subscription(self, context: NewHeadsSubscriptionContext):
         await self.process_new_block(Block(number=context.result["number"]))
