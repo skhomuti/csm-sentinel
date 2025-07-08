@@ -49,8 +49,14 @@ class Subscription:
         loop.add_signal_handler(signal.SIGTERM, self._signal_handler, loop)
 
     def _signal_handler(self, loop: BaseEventLoop):
+        async def _safe_unsubscribe_all():
+            try:
+                await self._w3.subscription_manager.unsubscribe_all()
+            except ConnectionClosed:
+                pass
+
         logger.info("Signal received, shutting down...")
-        loop.create_task(self._w3.subscription_manager.unsubscribe_all())
+        loop.create_task(_safe_unsubscribe_all())
         self._shutdown_event.set()
 
     @staticmethod
