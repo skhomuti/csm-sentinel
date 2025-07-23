@@ -1,0 +1,2161 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "queueLowestPriority",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "AccessControlBadConfirmation",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "neededRole",
+        "type": "bytes32"
+      }
+    ],
+    "name": "AccessControlUnauthorizedAccount",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidAllowedExitDelay",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidInitialization",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidKeyNumberValueIntervals",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidPerformanceCoefficients",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidPerformanceLeewayData",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidRewardShareData",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidStrikesParams",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotInitializing",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "QueueCannotBeUsed",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint8",
+        "name": "bits",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "SafeCastOverflowedUintDowncast",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroAdminAddress",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroMaxDeposits",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroQueueLowestPriority",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "delay",
+        "type": "uint256"
+      }
+    ],
+    "name": "AllowedExitDelaySet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "AllowedExitDelayUnset",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "penalty",
+        "type": "uint256"
+      }
+    ],
+    "name": "BadPerformancePenaltySet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "BadPerformancePenaltyUnset",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "delay",
+        "type": "uint256"
+      }
+    ],
+    "name": "DefaultAllowedExitDelaySet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "DefaultBadPerformancePenaltySet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "DefaultElRewardsStealingAdditionalFineSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "penalty",
+        "type": "uint256"
+      }
+    ],
+    "name": "DefaultExitDelayPenaltySet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "DefaultKeyRemovalChargeSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "DefaultKeysLimitSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
+      }
+    ],
+    "name": "DefaultMaxWithdrawalRequestFeeSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "attestationsWeight",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "blocksWeight",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "syncWeight",
+        "type": "uint256"
+      }
+    ],
+    "name": "DefaultPerformanceCoefficientsSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "DefaultPerformanceLeewaySet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "priority",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "maxDeposits",
+        "type": "uint256"
+      }
+    ],
+    "name": "DefaultQueueConfigSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      }
+    ],
+    "name": "DefaultRewardShareSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "lifetime",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "threshold",
+        "type": "uint256"
+      }
+    ],
+    "name": "DefaultStrikesParamsSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "fine",
+        "type": "uint256"
+      }
+    ],
+    "name": "ElRewardsStealingAdditionalFineSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "ElRewardsStealingAdditionalFineUnset",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "penalty",
+        "type": "uint256"
+      }
+    ],
+    "name": "ExitDelayPenaltySet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "ExitDelayPenaltyUnset",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "version",
+        "type": "uint64"
+      }
+    ],
+    "name": "Initialized",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "keyRemovalCharge",
+        "type": "uint256"
+      }
+    ],
+    "name": "KeyRemovalChargeSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "KeyRemovalChargeUnset",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "limit",
+        "type": "uint256"
+      }
+    ],
+    "name": "KeysLimitSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "KeysLimitUnset",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
+      }
+    ],
+    "name": "MaxWithdrawalRequestFeeSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "MaxWithdrawalRequestFeeUnset",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "attestationsWeight",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "blocksWeight",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "syncWeight",
+        "type": "uint256"
+      }
+    ],
+    "name": "PerformanceCoefficientsSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "PerformanceCoefficientsUnset",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "minKeyNumber",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct ICSParametersRegistry.KeyNumberValueInterval[]",
+        "name": "data",
+        "type": "tuple[]"
+      }
+    ],
+    "name": "PerformanceLeewayDataSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "PerformanceLeewayDataUnset",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "priority",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "maxDeposits",
+        "type": "uint256"
+      }
+    ],
+    "name": "QueueConfigSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "QueueConfigUnset",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "minKeyNumber",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct ICSParametersRegistry.KeyNumberValueInterval[]",
+        "name": "data",
+        "type": "tuple[]"
+      }
+    ],
+    "name": "RewardShareDataSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "RewardShareDataUnset",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "previousAdminRole",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "newAdminRole",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RoleAdminChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      }
+    ],
+    "name": "RoleGranted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      }
+    ],
+    "name": "RoleRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "lifetime",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "threshold",
+        "type": "uint256"
+      }
+    ],
+    "name": "StrikesParamsSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "StrikesParamsUnset",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "DEFAULT_ADMIN_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "QUEUE_LEGACY_PRIORITY",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "QUEUE_LOWEST_PRIORITY",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defaultAllowedExitDelay",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defaultBadPerformancePenalty",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defaultElRewardsStealingAdditionalFine",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defaultExitDelayPenalty",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defaultKeyRemovalCharge",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defaultKeysLimit",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defaultMaxWithdrawalRequestFee",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defaultPerformanceCoefficients",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "attestationsWeight",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "blocksWeight",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "syncWeight",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defaultPerformanceLeeway",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defaultQueueConfig",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "priority",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "maxDeposits",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defaultRewardShare",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "defaultStrikesParams",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "lifetime",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "threshold",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getAllowedExitDelay",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "delay",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getBadPerformancePenalty",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "penalty",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getElRewardsStealingAdditionalFine",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "fine",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getExitDelayPenalty",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "penalty",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getInitializedVersion",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getKeyRemovalCharge",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "keyRemovalCharge",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getKeysLimit",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "limit",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getMaxWithdrawalRequestFee",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getPerformanceCoefficients",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "attestationsWeight",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "blocksWeight",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "syncWeight",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getPerformanceLeewayData",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "minKeyNumber",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct ICSParametersRegistry.KeyNumberValueInterval[]",
+        "name": "data",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getQueueConfig",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "queuePriority",
+        "type": "uint32"
+      },
+      {
+        "internalType": "uint32",
+        "name": "maxDeposits",
+        "type": "uint32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getRewardShareData",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "minKeyNumber",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct ICSParametersRegistry.KeyNumberValueInterval[]",
+        "name": "data",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      }
+    ],
+    "name": "getRoleAdmin",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "name": "getRoleMember",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      }
+    ],
+    "name": "getRoleMemberCount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getStrikesParams",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "lifetime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "threshold",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "grantRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "hasRole",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "admin",
+        "type": "address"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "keyRemovalCharge",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "elRewardsStealingAdditionalFine",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "keysLimit",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "rewardShare",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "performanceLeeway",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "strikesLifetime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "strikesThreshold",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "defaultQueuePriority",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "defaultQueueMaxDeposits",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "badPerformancePenalty",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "attestationsWeight",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "blocksWeight",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "syncWeight",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "defaultAllowedExitDelay",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "defaultExitDelayPenalty",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "defaultMaxWithdrawalRequestFee",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct ICSParametersRegistry.InitializationData",
+        "name": "data",
+        "type": "tuple"
+      }
+    ],
+    "name": "initialize",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "callerConfirmation",
+        "type": "address"
+      }
+    ],
+    "name": "renounceRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "revokeRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "delay",
+        "type": "uint256"
+      }
+    ],
+    "name": "setAllowedExitDelay",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "penalty",
+        "type": "uint256"
+      }
+    ],
+    "name": "setBadPerformancePenalty",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "delay",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDefaultAllowedExitDelay",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "penalty",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDefaultBadPerformancePenalty",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "fine",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDefaultElRewardsStealingAdditionalFine",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "penalty",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDefaultExitDelayPenalty",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "keyRemovalCharge",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDefaultKeyRemovalCharge",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "limit",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDefaultKeysLimit",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDefaultMaxWithdrawalRequestFee",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "attestationsWeight",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "blocksWeight",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "syncWeight",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDefaultPerformanceCoefficients",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "leeway",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDefaultPerformanceLeeway",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "priority",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxDeposits",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDefaultQueueConfig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "share",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDefaultRewardShare",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "lifetime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "threshold",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDefaultStrikesParams",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "fine",
+        "type": "uint256"
+      }
+    ],
+    "name": "setElRewardsStealingAdditionalFine",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "penalty",
+        "type": "uint256"
+      }
+    ],
+    "name": "setExitDelayPenalty",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "keyRemovalCharge",
+        "type": "uint256"
+      }
+    ],
+    "name": "setKeyRemovalCharge",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "limit",
+        "type": "uint256"
+      }
+    ],
+    "name": "setKeysLimit",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
+      }
+    ],
+    "name": "setMaxWithdrawalRequestFee",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "attestationsWeight",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "blocksWeight",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "syncWeight",
+        "type": "uint256"
+      }
+    ],
+    "name": "setPerformanceCoefficients",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "minKeyNumber",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct ICSParametersRegistry.KeyNumberValueInterval[]",
+        "name": "data",
+        "type": "tuple[]"
+      }
+    ],
+    "name": "setPerformanceLeewayData",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "priority",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxDeposits",
+        "type": "uint256"
+      }
+    ],
+    "name": "setQueueConfig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "minKeyNumber",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "value",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct ICSParametersRegistry.KeyNumberValueInterval[]",
+        "name": "data",
+        "type": "tuple[]"
+      }
+    ],
+    "name": "setRewardShareData",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "lifetime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "threshold",
+        "type": "uint256"
+      }
+    ],
+    "name": "setStrikesParams",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes4",
+        "name": "interfaceId",
+        "type": "bytes4"
+      }
+    ],
+    "name": "supportsInterface",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "unsetAllowedExitDelay",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "unsetBadPerformancePenalty",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "unsetElRewardsStealingAdditionalFine",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "unsetExitDelayPenalty",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "unsetKeyRemovalCharge",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "unsetKeysLimit",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "unsetMaxWithdrawalRequestFee",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "unsetPerformanceCoefficients",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "unsetPerformanceLeewayData",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "unsetQueueConfig",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "unsetRewardShareData",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "curveId",
+        "type": "uint256"
+      }
+    ],
+    "name": "unsetStrikesParams",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]
