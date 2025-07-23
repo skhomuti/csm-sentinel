@@ -223,3 +223,12 @@ class EventMessages:
 
         template: callable = EVENT_MESSAGES.get(event.event)
         return template(mode_before, limit_before, event.args['targetLimitMode'], event.args['targetValidatorsCount']) + self.footer(event)
+
+    @RegisterEvent("Initialized")
+    async def initialized(self, event: Event):
+        template: callable = EVENT_MESSAGES.get(event.event)
+        if event.args['version'] != 2:
+            return None
+        if event.address != os.getenv("CSM_ADDRESS"):
+            return None
+        return template() + self.footer(event)

@@ -2,6 +2,7 @@ import dataclasses
 import json
 import os
 
+from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 
 
@@ -33,6 +34,7 @@ class Event:
     args: dict
     block: int
     tx: HexBytes
+    address: ChecksumAddress
 
     def readable(self):
         args = ", ".join(f"{key}={value}" for key, value in self.args.items())

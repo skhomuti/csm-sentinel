@@ -16,7 +16,7 @@ from web3.types import EventData, FilterParams
 from websockets import ConnectionClosed
 
 from csm_bot.events import EVENTS_TO_FOLLOW
-from csm_bot.models import Event, Block, CSM_ABI, VEBO_ABI, FEE_DISTRIBUTOR_ABI
+from csm_bot.models import Event, Block, CSM_ABI, VEBO_ABI, FEE_DISTRIBUTOR_ABI, CSM_V2_ABI, FEE_DISTRIBUTOR_V2_ABI
 
 logger = logging.getLogger(__name__)
 logging.getLogger("web3.providers.persistent.subscription_manager").setLevel(logging.WARNING)
@@ -35,7 +35,7 @@ class Subscription:
         super().__init__()
         self._shutdown_event = asyncio.Event()
         self._w3 = w3
-        self.abi_by_topics = topics_to_follow(CSM_ABI, FEE_DISTRIBUTOR_ABI, VEBO_ABI)
+        self.abi_by_topics = topics_to_follow(CSM_ABI, CSM_V2_ABI, FEE_DISTRIBUTOR_ABI, FEE_DISTRIBUTOR_V2_ABI, VEBO_ABI)
 
     @property
     async def w3(self):
@@ -148,6 +148,7 @@ class Subscription:
                         args=event_data["args"],
                         block=event_data["blockNumber"],
                         tx=event_data["transactionHash"],
+                        address=event_data["address"],
                     )
                     if contract == os.getenv("VEBO_ADDRESS") and not self._filter_vebo_exit_requests(event):
                         continue
@@ -170,7 +171,8 @@ class Subscription:
         event = Event(event=event_data["event"],
                       args=event_data["args"],
                       block=event_data["blockNumber"],
-                      tx=event_data["transactionHash"])
+                      tx=event_data["transactionHash"],
+                      address=event_data["address"])
         if hasattr(context, "predicate") and not context.predicate(event):
             return
         await self.process_event_log(event)
