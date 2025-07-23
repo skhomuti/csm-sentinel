@@ -36,6 +36,7 @@ EVENT_DESCRIPTIONS = {
     "PublicRelease": "- 🎉 Public release of CSM!",
     "DistributionLogUpdated": "- 📈 New rewards distributed",
     "TargetValidatorsCountChanged": "- 🚨 Target validators count changed",
+    "Initialized": "- ✅ CSM v2 is here!",
 }
 
 EVENT_LIST_TEXT = markdown(
@@ -65,6 +66,7 @@ EVENT_LIST_TEXT = markdown(
     Bold("Common CSM Events for all the Node Operators:"), nl(1),
     EVENT_DESCRIPTIONS["DistributionLogUpdated"], nl(1),
     EVENT_DESCRIPTIONS["PublicRelease"], nl(),
+    EVENT_DESCRIPTIONS["Initialized"], nl(1),
 )
 
 WELCOME_TEXT = ("Welcome to the CSM Sentinel! " + nl() +
@@ -254,3 +256,7 @@ def target_validators_count_changed(mode_before, limit_before, mode_after, limit
             return markdown("🚨 ", Bold("Target validators count changed"), nl(),
                             f"Mode changed from {mode_before} to {mode_after}.", nl(1),
                             f"Limit changed from {limit_before} to {limit_after}.")
+
+@RegisterEventMessage("Initialized")
+def initialized():
+    return markdown("✅ ", Bold("🎉 CSM v2 is here!"))

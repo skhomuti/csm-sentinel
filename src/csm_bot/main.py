@@ -93,6 +93,9 @@ class TelegramSubscription(Subscription):
         chats = chats.intersection(actual_chat_ids)
 
         message = await event_messages.get_event_message(event)
+        if message is None:
+            logger.warning("No message found for event %s", event.readable())
+            return
 
         sent_messages = 0
         for chat in chats:
