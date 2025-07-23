@@ -7,9 +7,8 @@ from web3 import AsyncWeb3
 
 from csm_bot.models import (
     Event, ETHERSCAN_BLOCK_URL_TEMPLATE, BEACONCHAIN_URL_TEMPLATE, ETHERSCAN_TX_URL_TEMPLATE,
-    ACCOUNTING_ABI,
+    ACCOUNTING_ABI, CSM_ABI, ACCOUNTING_V2_ABI, CSM_V2_ABI, PARAMETERS_REGISTRY_ABI
 )
-from csm_bot.models import CSM_ABI
 from csm_bot.texts import EVENT_MESSAGES, EVENT_MESSAGE_FOOTER, EVENT_MESSAGE_FOOTER_TX_ONLY, EVENT_EMITS
 
 # This is a dictionary that will be populated with the events to follow
@@ -54,8 +53,21 @@ class EventMessages:
     def __init__(self, w3: AsyncWeb3):
         self.connectProvider = ConnectOnDemand(w3)
         self.w3 = w3
-        self.csm = self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_ABI, decode_tuples=True)
-        self.accounting = self.w3.eth.contract(address=os.getenv("ACCOUNTING_ADDRESS"), abi=ACCOUNTING_ABI, decode_tuples=True)
+
+        self.csm = self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_V2_ABI, decode_tuples=True)
+        self.csm_v2 = self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_ABI, decode_tuples=True)
+
+        self.accounting = self.w3.eth.contract(address=os.getenv("ACCOUNTING_ADDRESS"), abi=ACCOUNTING_V2_ABI, decode_tuples=True)
+        self.accounting_v2 = self.w3.eth.contract(address=os.getenv("ACCOUNTING_ADDRESS"), abi=ACCOUNTING_ABI, decode_tuples=True)
+
+        self.parametersRegistry = self.w3.eth.contract(address=os.getenv("PARAMETERS_REGISTRY_ADDRESS"), abi=PARAMETERS_REGISTRY_ABI, decode_tuples=True)
+
+    async def is_v2(self):
+        try:
+            return await self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_V2_ABI, decode_tuples=True).functions.getInitializedVersion().call() == 2
+        except Exception as e:
+            print(f"Error checking CSM version: {e}. Defaulting to CSM_V1 ABI.")
+            return False
 
     async def default(self, event: Event):
         return EVENT_EMITS.format(event.event, event.args)
@@ -80,7 +92,7 @@ class EventMessages:
     @RegisterEvent('ELRewardsStealingPenaltyCancelled')
     async def el_rewards_stealing_penalty_cancelled(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
-        remaining_amount = humanize_wei(await self.accounting.functions.getActualLockedBond(event.args['nodeOperatorId']).call())
+        remaining_amount = humanize_wei(await self.accounting_v2.functions.getActualLockedBond(event.args['nodeOperatorId']).call())
         return template(remaining_amount) + self.footer(event)
 
     @RegisterEvent('ELRewardsStealingPenaltyReported')
@@ -93,7 +105,7 @@ class EventMessages:
     @RegisterEvent('ELRewardsStealingPenaltySettled')
     async def el_rewards_stealing_penalty_settled(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
-        logs = await self.accounting.events.BondBurned().get_logs(from_block=event.block)
+        logs = await self.accounting_v2.events.BondBurned().get_logs(from_block=event.block)
         burnt_event = next(filter(lambda x: x.args['nodeOperatorId'] == event.args['nodeOperatorId'], logs), None)
         if burnt_event:
             amount = burnt_event.args["burnedAmount"]
@@ -103,6 +115,8 @@ class EventMessages:
 
     @RegisterEvent('InitialSlashingSubmitted')
     async def initial_slashing_submitted(self, event: Event):
+        if await self.is_v2():
+            return None
         template: callable = EVENT_MESSAGES.get(event.event)
         key = self.w3.to_hex(await self.csm.functions.getSigningKeys(event.args["nodeOperatorId"], event.args['keyIndex'], 1).call())
         key_url = BEACONCHAIN_URL_TEMPLATE.format(key)
@@ -111,7 +125,11 @@ class EventMessages:
     @RegisterEvent('KeyRemovalChargeApplied')
     async def key_removal_charge_applied(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
-        amount = await self.csm.functions.keyRemovalCharge().call(block_identifier=event.block)
+        if self.is_v2():
+            curve_id = await self.accounting_v2.functions.getBondCurveId(event.args['nodeOperatorId'])
+            amount = await self.parametersRegistry.functions.getKeyRemovalCharge(curve_id).call(block_identifier=event.block)
+        else:
+            amount = await self.csm.functions.keyRemovalCharge().call(block_identifier=event.block)
         return template(humanize_wei(amount)) + self.footer(event)
 
     @RegisterEvent('NodeOperatorManagerAddressChangeProposed')
@@ -136,6 +154,8 @@ class EventMessages:
 
     @RegisterEvent('StuckSigningKeysCountChanged')
     async def stuck_signing_keys_count_changed(self, event: Event):
+        if await self.is_v2():
+            return None
         template: callable = EVENT_MESSAGES.get(event.event)
         return template(event.args['stuckKeysCount']) + self.footer(event)
 
@@ -146,15 +166,25 @@ class EventMessages:
 
     @RegisterEvent('WithdrawalSubmitted')
     async def withdrawal_submitted(self, event: Event):
+        # TODO add exit penalties applied
+        if await self.is_v2():
+            csm = self.csm_v2
+        else:
+            csm = self.csm
         template: callable = EVENT_MESSAGES.get(event.event)
-        key = self.w3.to_hex(await self.csm.functions.getSigningKeys(event.args["nodeOperatorId"], event.args['keyIndex'], 1).call())
+        key = self.w3.to_hex(await csm.functions.getSigningKeys(event.args["nodeOperatorId"], event.args['keyIndex'], 1).call())
         key_url = BEACONCHAIN_URL_TEMPLATE.format(key)
         return template(key, key_url, humanize_wei(event.args['amount'])) + self.footer(event)
 
     @RegisterEvent('TotalSigningKeysCountChanged')
     async def total_signing_keys_count_changed(self, event: Event):
+        if await self.is_v2():
+            csm = self.csm_v2
+        else:
+            csm = self.csm
+
         template: callable = EVENT_MESSAGES.get(event.event)
-        node_operator = await self.csm.functions.getNodeOperator(event.args["nodeOperatorId"]).call(block_identifier=event.block - 1)
+        node_operator = await csm.functions.getNodeOperator(event.args["nodeOperatorId"]).call(block_identifier=event.block - 1)
         return template(event.args['totalKeysCount'], node_operator.totalAddedKeys) + self.footer(event)
 
     @RegisterEvent('ValidatorExitRequest')
@@ -168,17 +198,25 @@ class EventMessages:
 
     @RegisterEvent('PublicRelease')
     async def public_release(self, event: Event):
+        if await self.is_v2():
+            return None
         template: callable = EVENT_MESSAGES.get(event.event)
         return template() + self.footer(event)
 
     @RegisterEvent("DistributionDataUpdated")
     async def distribution_data_updated(self, event: Event):
+        # TODO add StrikesDataUpdated
         template: callable = EVENT_MESSAGES.get(event.event)
         return template() + self.footer(event)
 
     @RegisterEvent("TargetValidatorsCountChanged")
     async def target_validators_count_changed(self, event: Event):
-        node_operator = await self.csm.functions.getNodeOperator(event.args["nodeOperatorId"]).call(
+        if await self.is_v2():
+            csm = self.csm_v2
+        else:
+            csm = self.csm
+
+        node_operator = await csm.functions.getNodeOperator(event.args["nodeOperatorId"]).call(
             block_identifier=event.block - 1)
         mode_before = node_operator.targetLimitMode
         limit_before = node_operator.targetLimit
