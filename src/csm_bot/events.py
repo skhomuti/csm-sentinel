@@ -54,11 +54,11 @@ class EventMessages:
         self.connectProvider = ConnectOnDemand(w3)
         self.w3 = w3
 
-        self.csm = self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_V2_ABI, decode_tuples=True)
-        self.csm_v2 = self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_ABI, decode_tuples=True)
+        self.csm = self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_ABI, decode_tuples=True)
+        self.csm_v2 = self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_V2_ABI, decode_tuples=True)
 
-        self.accounting = self.w3.eth.contract(address=os.getenv("ACCOUNTING_ADDRESS"), abi=ACCOUNTING_V2_ABI, decode_tuples=True)
-        self.accounting_v2 = self.w3.eth.contract(address=os.getenv("ACCOUNTING_ADDRESS"), abi=ACCOUNTING_ABI, decode_tuples=True)
+        self.accounting = self.w3.eth.contract(address=os.getenv("ACCOUNTING_ADDRESS"), abi=ACCOUNTING_ABI, decode_tuples=True)
+        self.accounting_v2 = self.w3.eth.contract(address=os.getenv("ACCOUNTING_ADDRESS"), abi=ACCOUNTING_V2_ABI, decode_tuples=True)
 
         self.parametersRegistry = self.w3.eth.contract(address=os.getenv("PARAMETERS_REGISTRY_ADDRESS"), abi=PARAMETERS_REGISTRY_ABI, decode_tuples=True)
 
@@ -125,7 +125,7 @@ class EventMessages:
     @RegisterEvent('KeyRemovalChargeApplied')
     async def key_removal_charge_applied(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
-        if self.is_v2():
+        if await self.is_v2():
             curve_id = await self.accounting_v2.functions.getBondCurveId(event.args['nodeOperatorId'])
             amount = await self.parametersRegistry.functions.getKeyRemovalCharge(curve_id).call(block_identifier=event.block)
         else:
