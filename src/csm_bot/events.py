@@ -126,7 +126,7 @@ class EventMessages:
     async def key_removal_charge_applied(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         if await self.is_v2():
-            curve_id = await self.accounting_v2.functions.getBondCurveId(event.args['nodeOperatorId'])
+            curve_id = await self.accounting_v2.functions.getBondCurveId(event.args['nodeOperatorId']).call()
             amount = await self.parametersRegistry.functions.getKeyRemovalCharge(curve_id).call(block_identifier=event.block)
         else:
             amount = await self.csm.functions.keyRemovalCharge().call(block_identifier=event.block)
