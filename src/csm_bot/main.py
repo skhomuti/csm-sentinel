@@ -75,8 +75,12 @@ class TelegramSubscription(Subscription):
             # For distribution rewards, only notify chats subscribed to node operators with active keys
             chats = set()
             for node_operator_id, subscribed_chats in context.bot_data["no_ids_to_chats"].items():
-                if await event_messages.has_active_keys(int(node_operator_id)):
-                    chats.update(subscribed_chats)
+                try:
+                    if await event_messages.has_active_keys(int(node_operator_id)):
+                        chats.update(subscribed_chats)
+                except Exception as e:
+                    logger.warning("Failed to check active keys for node operator %s: %s", node_operator_id, e)
+                    # Skip this node operator if we can't determine its status
         else:
             # all chats that subscribed to any node operator
             chats = set(chain(*context.bot_data["no_ids_to_chats"].values()))
