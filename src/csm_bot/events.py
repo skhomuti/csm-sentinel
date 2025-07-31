@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import logging
 import os
 
 from eth_utils import humanize_wei
@@ -14,6 +15,11 @@ from csm_bot.texts import EVENT_MESSAGES, EVENT_MESSAGE_FOOTER, EVENT_MESSAGE_FO
 
 # This is a dictionary that will be populated with the events to follow
 EVENTS_TO_FOLLOW = {}
+
+# Registry for event filtering requirements
+EVENT_FILTERS = {}
+
+logger = logging.getLogger(__name__)
 
 
 class ConnectOnDemand:
@@ -41,12 +47,28 @@ def _format_date(date: datetime.datetime):
     return date.strftime("%a %d %b %Y, %I:%M%p UTC")
 
 
+class EventFilter:
+    """Base class for event filters."""
+    async def should_notify(self, event, node_operator_id: int, event_messages) -> bool:
+        """Return True if the node operator should receive notifications for this event."""
+        raise NotImplementedError
+
+
+class ActiveKeysFilter(EventFilter):
+    """Filter that only allows notifications for node operators with active keys."""
+    async def should_notify(self, event, node_operator_id: int, event_messages) -> bool:
+        return await event_messages.has_active_keys(node_operator_id)
+
+
 class RegisterEvent:
-    def __init__(self, event_name):
+    def __init__(self, event_name, event_filter: EventFilter = None):
         self.event_name = event_name
+        self.event_filter = event_filter
 
     def __call__(self, func):
         EVENTS_TO_FOLLOW[self.event_name] = func
+        if self.event_filter:
+            EVENT_FILTERS[self.event_name] = self.event_filter
         return func
 
 
@@ -175,14 +197,30 @@ class EventMessages:
         """Check if a node operator has active (non-withdrawn) keys."""
         try:
             node_operator = await self.csm.functions.getNodeOperator(node_operator_id).call()
-            # Active keys = deposited keys that haven't been withdrawn
-            active_keys = node_operator.totalDepositedKeys - node_operator.totalWithdrawnKeys
-            return active_keys > 0
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to fetch node operator %s data: %s", node_operator_id, e)
             # If we can't determine, assume no active keys to be safe
             return False
+        
+        # Active keys = deposited keys that haven't been withdrawn
+        active_keys = node_operator.totalDepositedKeys - node_operator.totalWithdrawnKeys
+        return active_keys > 0
 
-    @RegisterEvent("DistributionDataUpdated")
+    async def should_notify_node_operator(self, event, node_operator_id: int) -> bool:
+        """Check if a node operator should be notified for this event based on any registered filters."""
+        event_filter = EVENT_FILTERS.get(event.event)
+        if event_filter:
+            try:
+                return await event_filter.should_notify(event, node_operator_id, self)
+            except Exception as e:
+                logger.warning("Failed to apply filter for event %s and node operator %s: %s", 
+                             event.event, node_operator_id, e)
+                # If we can't determine, don't send notification to be safe
+                return False
+        # No filter registered, allow notification
+        return True
+
+    @RegisterEvent("DistributionDataUpdated", ActiveKeysFilter())
     async def distribution_data_updated(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         return template() + self.footer(event)

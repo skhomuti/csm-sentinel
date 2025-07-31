@@ -71,19 +71,13 @@ class TelegramSubscription(Subscription):
                            .union(context.bot_data.get("channel_ids", set())))
         if "nodeOperatorId" in event.args:
             chats = context.bot_data["no_ids_to_chats"].get(str(event.args["nodeOperatorId"]), set())
-        elif event.event == "DistributionDataUpdated":
-            # For distribution rewards, only notify chats subscribed to node operators with active keys
+        else:
+            # For events without a specific node operator, check all subscribed node operators
+            # and apply any registered filters
             chats = set()
             for node_operator_id, subscribed_chats in context.bot_data["no_ids_to_chats"].items():
-                try:
-                    if await event_messages.has_active_keys(int(node_operator_id)):
-                        chats.update(subscribed_chats)
-                except Exception as e:
-                    logger.warning("Failed to check active keys for node operator %s: %s", node_operator_id, e)
-                    # Skip this node operator if we can't determine its status
-        else:
-            # all chats that subscribed to any node operator
-            chats = set(chain(*context.bot_data["no_ids_to_chats"].values()))
+                if await event_messages.should_notify_node_operator(event, int(node_operator_id)):
+                    chats.update(subscribed_chats)
         chats = chats.intersection(actual_chat_ids)
 
         message = await event_messages.get_event_message(event)
