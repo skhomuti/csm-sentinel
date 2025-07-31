@@ -171,6 +171,17 @@ class EventMessages:
         template: callable = EVENT_MESSAGES.get(event.event)
         return template() + self.footer(event)
 
+    async def has_active_keys(self, node_operator_id: int) -> bool:
+        """Check if a node operator has active (non-withdrawn) keys."""
+        try:
+            node_operator = await self.csm.functions.getNodeOperator(node_operator_id).call()
+            # Active keys = deposited keys that haven't been withdrawn
+            active_keys = node_operator.totalDepositedKeys - node_operator.totalWithdrawnKeys
+            return active_keys > 0
+        except Exception:
+            # If we can't determine, assume no active keys to be safe
+            return False
+
     @RegisterEvent("DistributionDataUpdated")
     async def distribution_data_updated(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)

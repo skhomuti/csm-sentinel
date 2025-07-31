@@ -71,6 +71,12 @@ class TelegramSubscription(Subscription):
                            .union(context.bot_data.get("channel_ids", set())))
         if "nodeOperatorId" in event.args:
             chats = context.bot_data["no_ids_to_chats"].get(str(event.args["nodeOperatorId"]), set())
+        elif event.event == "DistributionDataUpdated":
+            # For distribution rewards, only notify chats subscribed to node operators with active keys
+            chats = set()
+            for node_operator_id, subscribed_chats in context.bot_data["no_ids_to_chats"].items():
+                if await event_messages.has_active_keys(int(node_operator_id)):
+                    chats.update(subscribed_chats)
         else:
             # all chats that subscribed to any node operator
             chats = set(chain(*context.bot_data["no_ids_to_chats"].values()))
