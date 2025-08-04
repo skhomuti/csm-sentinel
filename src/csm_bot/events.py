@@ -1,8 +1,10 @@
 import asyncio
 import datetime
+import json
 import logging
 import os
 
+import aiohttp
 from eth_utils import humanize_wei
 from web3 import AsyncWeb3
 
@@ -58,6 +60,56 @@ class ActiveKeysFilter(EventFilter):
     """Filter that only allows notifications for node operators with active keys."""
     async def should_notify(self, event, node_operator_id: int, event_messages) -> bool:
         return await event_messages.has_active_keys(node_operator_id)
+
+
+class IPFSDistributionFilter(EventFilter):
+    """Filter that checks if node operator exists in IPFS distribution data."""
+    
+    def __init__(self):
+        self._cache = {}  # Cache distribution data per event
+        
+    async def should_notify(self, event, node_operator_id: int, event_messages) -> bool:
+        """Check if node operator ID exists in the IPFS distribution data."""
+        # Use event transaction hash as cache key to ensure we fetch once per event
+        cache_key = event.tx.hex()
+        
+        if cache_key not in self._cache:
+            # Fetch distribution data from IPFS
+            try:
+                distribution_data = await self._fetch_distribution_data(event)
+                self._cache[cache_key] = distribution_data
+            except Exception as e:
+                logger.warning("Failed to fetch IPFS distribution data for event %s: %s", 
+                             event.event, e)
+                # If we can't fetch data, don't send notifications to be safe
+                self._cache[cache_key] = None
+                return False
+        
+        distribution_data = self._cache[cache_key]
+        if distribution_data is None:
+            return False
+            
+        # Check if node operator ID exists in the operators list
+        operators = distribution_data.get("operators", {})
+        return str(node_operator_id) in operators
+    
+    async def _fetch_distribution_data(self, event):
+        """Fetch distribution data from IPFS using treeCid from event args."""
+        tree_cid = event.args.get("treeCid")
+        if not tree_cid:
+            raise ValueError("treeCid not found in event args")
+            
+        ipfs_url = f"https://ipfs.io/ipfs/{tree_cid}"
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(ipfs_url) as response:
+                if response.status != 200:
+                    raise aiohttp.ClientError(f"HTTP {response.status} when fetching {ipfs_url}")
+                return await response.json()
+    
+    def clear_cache(self):
+        """Clear the internal cache. Useful for testing or memory management."""
+        self._cache.clear()
 
 
 class RegisterEvent:
@@ -220,7 +272,7 @@ class EventMessages:
         # No filter registered, allow notification
         return True
 
-    @RegisterEvent("DistributionDataUpdated", ActiveKeysFilter())
+    @RegisterEvent("DistributionDataUpdated", IPFSDistributionFilter())
     async def distribution_data_updated(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         return template() + self.footer(event)
