@@ -440,3 +440,39 @@ async def test_ipfs_distribution_filter_handles_empty_operators(mock_get):
     result = await filter_instance.should_notify(event, 123, None)
     
     assert result is False
+
+
+@pytest.mark.asyncio
+@patch('aiohttp.ClientSession.get')
+@patch.dict('os.environ', {
+    'ETHERSCAN_URL': 'https://etherscan.io',
+    'BEACONCHAIN_URL': 'https://beaconcha.in',
+    'CSM_ADDRESS': '0x1234567890123456789012345678901234567890',
+    'ACCOUNTING_ADDRESS': '0x1234567890123456789012345678901234567890'
+})
+async def test_ipfs_distribution_filter_handles_timeout(mock_get):
+    """Test that IPFSDistributionFilter handles timeout errors gracefully."""
+    from src.csm_bot.events import IPFSDistributionFilter
+    from src.csm_bot.models import Event
+    import asyncio
+    
+    # Mock timeout error
+    mock_context_manager = AsyncMock()
+    mock_context_manager.__aenter__ = AsyncMock(side_effect=asyncio.TimeoutError("Timeout"))
+    mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+    mock_get.return_value = mock_context_manager
+    
+    # Create test event
+    event = Event(
+        event="DistributionDataUpdated",
+        args={"treeCid": "QmTestHash123"},
+        block=123456,
+        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234")
+    )
+    
+    # Test the filter
+    filter_instance = IPFSDistributionFilter()
+    result = await filter_instance.should_notify(event, 123, None)
+    
+    # Should return False when timeout occurs
+    assert result is False

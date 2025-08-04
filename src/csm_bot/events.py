@@ -101,7 +101,9 @@ class IPFSDistributionFilter(EventFilter):
             
         ipfs_url = f"https://ipfs.io/ipfs/{tree_cid}"
         
-        async with aiohttp.ClientSession() as session:
+        # Use timeout to prevent hanging requests
+        timeout = aiohttp.ClientTimeout(total=30)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(ipfs_url) as response:
                 if response.status != 200:
                     raise aiohttp.ClientError(f"HTTP {response.status} when fetching {ipfs_url}")
