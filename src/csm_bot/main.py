@@ -72,8 +72,12 @@ class TelegramSubscription(Subscription):
         if "nodeOperatorId" in event.args:
             chats = context.bot_data["no_ids_to_chats"].get(str(event.args["nodeOperatorId"]), set())
         else:
-            # all chats that subscribed to any node operator
-            chats = set(chain(*context.bot_data["no_ids_to_chats"].values()))
+            # For events without a specific node operator, check all subscribed node operators
+            # and apply any registered filters
+            chats = set()
+            for node_operator_id, subscribed_chats in context.bot_data["no_ids_to_chats"].items():
+                if await event_messages.should_notify_node_operator(event, int(node_operator_id)):
+                    chats.update(subscribed_chats)
         chats = chats.intersection(actual_chat_ids)
 
         message = await event_messages.get_event_message(event)
