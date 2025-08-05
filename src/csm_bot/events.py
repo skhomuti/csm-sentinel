@@ -96,7 +96,11 @@ class EventMessages:
         return EVENT_EMITS.format(event.event, event.args)
 
     async def get_event_message(self, event: Event):
-        handler = EVENTS_TO_FOLLOW.get(event.event, self.default).handler
+        event_handler = EVENTS_TO_FOLLOW.get(event.event)
+        if event_handler is not None:
+            handler = event_handler.handler
+        else:
+            handler = self.default
         async with self.connectProvider:
             return await handler(self, event)
 
