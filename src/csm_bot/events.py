@@ -1,28 +1,24 @@
 import asyncio
 import datetime
-import json
 import logging
 import os
 
 import aiohttp
 from eth_utils import humanize_wei
 from web3 import AsyncWeb3
+from async_lru import alru_cache
 
 from csm_bot.models import (
     Event, ETHERSCAN_BLOCK_URL_TEMPLATE, BEACONCHAIN_URL_TEMPLATE, ETHERSCAN_TX_URL_TEMPLATE,
-    ACCOUNTING_ABI,
+    ACCOUNTING_ABI, EventFilter, EventHandler,
 )
 from csm_bot.models import CSM_ABI
 from csm_bot.texts import EVENT_MESSAGES, EVENT_MESSAGE_FOOTER, EVENT_MESSAGE_FOOTER_TX_ONLY, EVENT_EMITS
 
 # This is a dictionary that will be populated with the events to follow
-EVENTS_TO_FOLLOW = {}
-
-# Registry for event filtering requirements
-EVENT_FILTERS = {}
+EVENTS_TO_FOLLOW: dict[str, EventHandler] = {}
 
 logger = logging.getLogger(__name__)
-
 
 class ConnectOnDemand:
     connected_clients = 0
@@ -49,57 +45,26 @@ def _format_date(date: datetime.datetime):
     return date.strftime("%a %d %b %Y, %I:%M%p UTC")
 
 
-class EventFilter:
-    """Base class for event filters."""
-    async def should_notify(self, event, node_operator_id: int, event_messages) -> bool:
-        """Return True if the node operator should receive notifications for this event."""
-        raise NotImplementedError
-
-
-class ActiveKeysFilter(EventFilter):
-    """Filter that only allows notifications for node operators with active keys."""
-    async def should_notify(self, event, node_operator_id: int, event_messages) -> bool:
-        return await event_messages.has_active_keys(node_operator_id)
-
-
 class IPFSDistributionFilter(EventFilter):
     """Filter that checks if node operator exists in IPFS distribution data."""
     
-    def __init__(self):
-        self._cache = {}  # Cache distribution data per event
-        
     async def should_notify(self, event, node_operator_id: int, event_messages) -> bool:
         """Check if node operator ID exists in the IPFS distribution data."""
-        # Use event transaction hash as cache key to ensure we fetch once per event
-        cache_key = event.tx.hex()
-        
-        if cache_key not in self._cache:
-            # Fetch distribution data from IPFS
-            try:
-                distribution_data = await self._fetch_distribution_data(event)
-                self._cache[cache_key] = distribution_data
-            except Exception as e:
-                logger.warning("Failed to fetch IPFS distribution data for event %s: %s", 
-                             event.event, e)
-                # If we can't fetch data, don't send notifications to be safe
-                self._cache[cache_key] = None
-                return False
-        
-        distribution_data = self._cache[cache_key]
-        if distribution_data is None:
+        try:
+            distribution_log = await self._fetch_distribution_log(event.args.get("logCid"))
+        except Exception as e:
+            logger.warning("Failed to fetch IPFS distribution data for event %s: %s",
+                         event.event, e)
             return False
-            
+        
         # Check if node operator ID exists in the operators list
-        operators = distribution_data.get("operators", {})
+        operators = distribution_log.get("operators", {})
         return str(node_operator_id) in operators
-    
-    async def _fetch_distribution_data(self, event):
-        """Fetch distribution data from IPFS using treeCid from event args."""
-        tree_cid = event.args.get("treeCid")
-        if not tree_cid:
-            raise ValueError("treeCid not found in event args")
-            
-        ipfs_url = f"https://ipfs.io/ipfs/{tree_cid}"
+
+    @alru_cache(maxsize=3)
+    async def _fetch_distribution_log(self, log_cid: str):
+        """Fetch distribution data from IPFS using logCid."""
+        ipfs_url = f"https://ipfs.io/ipfs/{log_cid}"
         
         # Use timeout to prevent hanging requests
         timeout = aiohttp.ClientTimeout(total=30)
@@ -109,10 +74,6 @@ class IPFSDistributionFilter(EventFilter):
                     raise aiohttp.ClientError(f"HTTP {response.status} when fetching {ipfs_url}")
                 return await response.json()
     
-    def clear_cache(self):
-        """Clear the internal cache. Useful for testing or memory management."""
-        self._cache.clear()
-
 
 class RegisterEvent:
     def __init__(self, event_name, event_filter: EventFilter = None):
@@ -120,9 +81,7 @@ class RegisterEvent:
         self.event_filter = event_filter
 
     def __call__(self, func):
-        EVENTS_TO_FOLLOW[self.event_name] = func
-        if self.event_filter:
-            EVENT_FILTERS[self.event_name] = self.event_filter
+        EVENTS_TO_FOLLOW[self.event_name] = EventHandler(self.event_name, func, self.event_filter)
         return func
 
 
@@ -137,9 +96,9 @@ class EventMessages:
         return EVENT_EMITS.format(event.event, event.args)
 
     async def get_event_message(self, event: Event):
-        callback = EVENTS_TO_FOLLOW.get(event.event, self.default)
+        handler = EVENTS_TO_FOLLOW.get(event.event, self.default).handler
         async with self.connectProvider:
-            return await callback(self, event)
+            return await handler(self, event)
 
     @staticmethod
     def footer(event: Event):
@@ -147,6 +106,21 @@ class EventMessages:
         if 'nodeOperatorId' not in event.args:
             return EVENT_MESSAGE_FOOTER_TX_ONLY(tx_link).as_markdown()
         return EVENT_MESSAGE_FOOTER(event.args['nodeOperatorId'], tx_link).as_markdown()
+
+    async def should_notify_node_operator(self, event: Event, node_operator_id: int) -> bool:
+        """Check if a node operator should be notified for this event based on any registered filters."""
+        event_filter: EventFilter = EVENTS_TO_FOLLOW.get(event.event).filter
+        if event_filter:
+            try:
+                async with self.connectProvider:
+                    return await event_filter.should_notify(event, node_operator_id, self)
+            except Exception as e:
+                logger.warning("Failed to apply filter for event %s and node operator %s: %s",
+                             event.event, node_operator_id, e)
+                # If we can't determine, don't send notification to be safe
+                return False
+        # No filter registered, allow notification
+        return True
 
     @RegisterEvent('DepositedSigningKeysCountChanged')
     async def deposited_signing_keys_count_changed(self, event: Event):
@@ -247,34 +221,7 @@ class EventMessages:
         template: callable = EVENT_MESSAGES.get(event.event)
         return template() + self.footer(event)
 
-    async def has_active_keys(self, node_operator_id: int) -> bool:
-        """Check if a node operator has active (non-withdrawn) keys."""
-        try:
-            node_operator = await self.csm.functions.getNodeOperator(node_operator_id).call()
-        except Exception as e:
-            logger.warning("Failed to fetch node operator %s data: %s", node_operator_id, e)
-            # If we can't determine, assume no active keys to be safe
-            return False
-        
-        # Active keys = deposited keys that haven't been withdrawn
-        active_keys = node_operator.totalDepositedKeys - node_operator.totalWithdrawnKeys
-        return active_keys > 0
-
-    async def should_notify_node_operator(self, event, node_operator_id: int) -> bool:
-        """Check if a node operator should be notified for this event based on any registered filters."""
-        event_filter = EVENT_FILTERS.get(event.event)
-        if event_filter:
-            try:
-                return await event_filter.should_notify(event, node_operator_id, self)
-            except Exception as e:
-                logger.warning("Failed to apply filter for event %s and node operator %s: %s", 
-                             event.event, node_operator_id, e)
-                # If we can't determine, don't send notification to be safe
-                return False
-        # No filter registered, allow notification
-        return True
-
-    @RegisterEvent("DistributionDataUpdated", IPFSDistributionFilter())
+    @RegisterEvent("DistributionLogUpdated", IPFSDistributionFilter())
     async def distribution_data_updated(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         return template() + self.footer(event)

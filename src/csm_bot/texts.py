@@ -34,7 +34,7 @@ EVENT_DESCRIPTIONS = {
     "TotalSigningKeysCountChanged": "- 👀 New keys uploaded or removed",
     "ValidatorExitRequest": "- 🚨 One of the validators requested to exit",
     "PublicRelease": "- 🎉 Public release of CSM!",
-    "DistributionDataUpdated": "- 📈 New rewards distributed",
+    "DistributionLogUpdated": "- 📈 New rewards distributed",
     "TargetValidatorsCountChanged": "- 🚨 Target validators count changed",
 }
 
@@ -63,7 +63,7 @@ EVENT_LIST_TEXT = markdown(
     EVENT_DESCRIPTIONS["ValidatorExitRequest"], nl(1),
     EVENT_DESCRIPTIONS["WithdrawalSubmitted"], nl(),
     Bold("Common CSM Events for all the Node Operators:"), nl(1),
-    EVENT_DESCRIPTIONS["DistributionDataUpdated"], nl(1),
+    EVENT_DESCRIPTIONS["DistributionLogUpdated"], nl(1),
     EVENT_DESCRIPTIONS["PublicRelease"], nl(),
 )
 
@@ -210,7 +210,7 @@ def public_release():
                     "Now everyone can join the CSM and upload any number of keys.")
 
 
-@RegisterEventMessage("DistributionDataUpdated")
+@RegisterEventMessage("DistributionLogUpdated")
 def distribution_data_updated():
     return markdown("📈 ", Bold("Rewards distributed!"), nl(),
                     "Follow the ", TextLink("CSM UI", url=os.getenv("CSM_UI_URL")),
