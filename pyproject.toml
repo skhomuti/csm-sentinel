@@ -10,6 +10,8 @@ dependencies = [
     "python-dotenv",
     "tqdm>=4.66.5",
     "aiogram>=3.12.0",
+    "pytest-asyncio>=1.1.0",
+    "async-lru>=2.0.5",
 ]
 
 [build-system]

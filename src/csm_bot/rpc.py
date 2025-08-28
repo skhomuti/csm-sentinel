@@ -97,7 +97,7 @@ class Subscription:
             )
             subs_fd = LogsSubscription(
                 address=os.getenv("FEE_DISTRIBUTOR_ADDRESS"),
-                topics=[fee_distributor.events.DistributionDataUpdated().topic],
+                topics=[fee_distributor.events.DistributionLogUpdated().topic],
                 handler=self._handle_event_log_subscription
             )
             subs_heads = NewHeadsSubscription(handler=self._handle_new_block_subscription)

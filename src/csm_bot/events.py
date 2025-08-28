@@ -1,19 +1,32 @@
 import asyncio
 import datetime
+import logging
 import os
 
+import aiohttp
 from eth_utils import humanize_wei
 from web3 import AsyncWeb3
+from async_lru import alru_cache
 
 from csm_bot.models import (
-    Event, ETHERSCAN_BLOCK_URL_TEMPLATE, BEACONCHAIN_URL_TEMPLATE, ETHERSCAN_TX_URL_TEMPLATE,
-    ACCOUNTING_ABI, CSM_ABI, ACCOUNTING_V2_ABI, CSM_V2_ABI, PARAMETERS_REGISTRY_ABI
+    Event,
+    ETHERSCAN_BLOCK_URL_TEMPLATE,
+    BEACONCHAIN_URL_TEMPLATE,
+    ETHERSCAN_TX_URL_TEMPLATE,
+    ACCOUNTING_ABI,
+    EventFilter,
+    EventHandler,
+    CSM_ABI,
+    ACCOUNTING_V2_ABI,
+    CSM_V2_ABI,
+    PARAMETERS_REGISTRY_ABI,
 )
 from csm_bot.texts import EVENT_MESSAGES, EVENT_MESSAGE_FOOTER, EVENT_MESSAGE_FOOTER_TX_ONLY, EVENT_EMITS
 
 # This is a dictionary that will be populated with the events to follow
-EVENTS_TO_FOLLOW = {}
+EVENTS_TO_FOLLOW: dict[str, EventHandler] = {}
 
+logger = logging.getLogger(__name__)
 
 class ConnectOnDemand:
     connected_clients = 0
@@ -40,12 +53,43 @@ def _format_date(date: datetime.datetime):
     return date.strftime("%a %d %b %Y, %I:%M%p UTC")
 
 
+class IPFSDistributionFilter(EventFilter):
+    """Filter that checks if node operator exists in IPFS distribution data."""
+    
+    async def should_notify(self, event, node_operator_id: int, event_messages) -> bool:
+        """Check if node operator ID exists in the IPFS distribution data."""
+        try:
+            distribution_log = await self._fetch_distribution_log(event.args.get("logCid"))
+        except Exception as e:
+            logger.warning("Failed to fetch IPFS distribution data for event %s: %s",
+                         event.event, e)
+            return False
+        
+        # Check if node operator ID exists in the operators list
+        operators = distribution_log.get("operators", {})
+        return str(node_operator_id) in operators
+
+    @alru_cache(maxsize=3)
+    async def _fetch_distribution_log(self, log_cid: str):
+        """Fetch distribution data from IPFS using logCid."""
+        ipfs_url = f"https://ipfs.io/ipfs/{log_cid}"
+        
+        # Use timeout to prevent hanging requests
+        timeout = aiohttp.ClientTimeout(total=30)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(ipfs_url) as response:
+                if response.status != 200:
+                    raise aiohttp.ClientError(f"HTTP {response.status} when fetching {ipfs_url}")
+                return await response.json()
+    
+
 class RegisterEvent:
-    def __init__(self, event_name):
+    def __init__(self, event_name, event_filter: EventFilter = None):
         self.event_name = event_name
+        self.event_filter = event_filter
 
     def __call__(self, func):
-        EVENTS_TO_FOLLOW[self.event_name] = func
+        EVENTS_TO_FOLLOW[self.event_name] = EventHandler(self.event_name, func, self.event_filter)
         return func
 
 
@@ -54,17 +98,20 @@ class EventMessages:
         self.connectProvider = ConnectOnDemand(w3)
         self.w3 = w3
 
-        self.csm = self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_ABI, decode_tuples=True)
+        self.csm_v1 = self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_ABI, decode_tuples=True)
         self.csm_v2 = self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_V2_ABI, decode_tuples=True)
 
-        self.accounting = self.w3.eth.contract(address=os.getenv("ACCOUNTING_ADDRESS"), abi=ACCOUNTING_ABI, decode_tuples=True)
+        self.accounting_v1 = self.w3.eth.contract(address=os.getenv("ACCOUNTING_ADDRESS"), abi=ACCOUNTING_ABI, decode_tuples=True)
         self.accounting_v2 = self.w3.eth.contract(address=os.getenv("ACCOUNTING_ADDRESS"), abi=ACCOUNTING_V2_ABI, decode_tuples=True)
 
         self.parametersRegistry = self.w3.eth.contract(address=os.getenv("PARAMETERS_REGISTRY_ADDRESS"), abi=PARAMETERS_REGISTRY_ABI, decode_tuples=True)
 
-    async def is_v2(self):
+    async def is_v2(self, block_identifier: int | None = None):
         try:
-            return await self.w3.eth.contract(address=os.getenv("CSM_ADDRESS"), abi=CSM_V2_ABI, decode_tuples=True).functions.getInitializedVersion().call() == 2
+            version = await self.csm_v2.functions.getInitializedVersion().call(
+                block_identifier=block_identifier
+            )
+            return version == 2
         except Exception as e:
             print(f"Error checking CSM version: {e}. Defaulting to CSM_V1 ABI.")
             return False
@@ -73,9 +120,13 @@ class EventMessages:
         return EVENT_EMITS.format(event.event, event.args)
 
     async def get_event_message(self, event: Event):
-        callback = EVENTS_TO_FOLLOW.get(event.event, self.default)
+        event_handler = EVENTS_TO_FOLLOW.get(event.event)
+        if event_handler is not None:
+            handler = event_handler.handler
+        else:
+            handler = self.default
         async with self.connectProvider:
-            return await callback(self, event)
+            return await handler(self, event)
 
     @staticmethod
     def footer(event: Event):
@@ -83,6 +134,21 @@ class EventMessages:
         if 'nodeOperatorId' not in event.args:
             return EVENT_MESSAGE_FOOTER_TX_ONLY(tx_link).as_markdown()
         return EVENT_MESSAGE_FOOTER(event.args['nodeOperatorId'], tx_link).as_markdown()
+
+    async def should_notify_node_operator(self, event: Event, node_operator_id: int) -> bool:
+        """Check if a node operator should be notified for this event based on any registered filters."""
+        event_filter: EventFilter = EVENTS_TO_FOLLOW.get(event.event).filter
+        if event_filter:
+            try:
+                async with self.connectProvider:
+                    return await event_filter.should_notify(event, node_operator_id, self)
+            except Exception as e:
+                logger.warning("Failed to apply filter for event %s and node operator %s: %s",
+                             event.event, node_operator_id, e)
+                # If we can't determine, don't send notification to be safe
+                return False
+        # No filter registered, allow notification
+        return True
 
     @RegisterEvent('DepositedSigningKeysCountChanged')
     async def deposited_signing_keys_count_changed(self, event: Event):
@@ -115,21 +181,25 @@ class EventMessages:
 
     @RegisterEvent('InitialSlashingSubmitted')
     async def initial_slashing_submitted(self, event: Event):
-        if await self.is_v2():
+        if await self.is_v2(event.block):
             return None
         template: callable = EVENT_MESSAGES.get(event.event)
-        key = self.w3.to_hex(await self.csm.functions.getSigningKeys(event.args["nodeOperatorId"], event.args['keyIndex'], 1).call())
+        key = self.w3.to_hex(await self.csm_v1.functions.getSigningKeys(event.args["nodeOperatorId"], event.args['keyIndex'], 1).call())
         key_url = BEACONCHAIN_URL_TEMPLATE.format(key)
         return template(key, key_url) + self.footer(event)
 
     @RegisterEvent('KeyRemovalChargeApplied')
     async def key_removal_charge_applied(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
-        if await self.is_v2():
-            curve_id = await self.accounting_v2.functions.getBondCurveId(event.args['nodeOperatorId']).call()
-            amount = await self.parametersRegistry.functions.getKeyRemovalCharge(curve_id).call(block_identifier=event.block)
+        if await self.is_v2(event.block):
+            curve_id = await self.accounting_v2.functions.getBondCurveId(
+                event.args['nodeOperatorId']
+            ).call(block_identifier=event.block)
+            amount = await self.parametersRegistry.functions.getKeyRemovalCharge(curve_id).call(
+                block_identifier=event.block
+            )
         else:
-            amount = await self.csm.functions.keyRemovalCharge().call(block_identifier=event.block)
+            amount = await self.csm_v1.functions.keyRemovalCharge().call(block_identifier=event.block)
         return template(humanize_wei(amount)) + self.footer(event)
 
     @RegisterEvent('NodeOperatorManagerAddressChangeProposed')
@@ -154,7 +224,7 @@ class EventMessages:
 
     @RegisterEvent('StuckSigningKeysCountChanged')
     async def stuck_signing_keys_count_changed(self, event: Event):
-        if await self.is_v2():
+        if await self.is_v2(event.block):
             return None
         template: callable = EVENT_MESSAGES.get(event.event)
         return template(event.args['stuckKeysCount']) + self.footer(event)
@@ -167,10 +237,10 @@ class EventMessages:
     @RegisterEvent('WithdrawalSubmitted')
     async def withdrawal_submitted(self, event: Event):
         # TODO add exit penalties applied
-        if await self.is_v2():
+        if await self.is_v2(event.block):
             csm = self.csm_v2
         else:
-            csm = self.csm
+            csm = self.csm_v1
         template: callable = EVENT_MESSAGES.get(event.event)
         key = self.w3.to_hex(await csm.functions.getSigningKeys(event.args["nodeOperatorId"], event.args['keyIndex'], 1).call())
         key_url = BEACONCHAIN_URL_TEMPLATE.format(key)
@@ -178,10 +248,10 @@ class EventMessages:
 
     @RegisterEvent('TotalSigningKeysCountChanged')
     async def total_signing_keys_count_changed(self, event: Event):
-        if await self.is_v2():
+        if await self.is_v2(event.block):
             csm = self.csm_v2
         else:
-            csm = self.csm
+            csm = self.csm_v1
 
         template: callable = EVENT_MESSAGES.get(event.event)
         node_operator = await csm.functions.getNodeOperator(event.args["nodeOperatorId"]).call(block_identifier=event.block - 1)
@@ -198,12 +268,12 @@ class EventMessages:
 
     @RegisterEvent('PublicRelease')
     async def public_release(self, event: Event):
-        if await self.is_v2():
+        if await self.is_v2(event.block):
             return None
         template: callable = EVENT_MESSAGES.get(event.event)
         return template() + self.footer(event)
 
-    @RegisterEvent("DistributionDataUpdated")
+    @RegisterEvent("DistributionLogUpdated", IPFSDistributionFilter())
     async def distribution_data_updated(self, event: Event):
         # TODO add StrikesDataUpdated
         template: callable = EVENT_MESSAGES.get(event.event)
@@ -211,10 +281,10 @@ class EventMessages:
 
     @RegisterEvent("TargetValidatorsCountChanged")
     async def target_validators_count_changed(self, event: Event):
-        if await self.is_v2():
+        if await self.is_v2(event.block):
             csm = self.csm_v2
         else:
-            csm = self.csm
+            csm = self.csm_v1
 
         node_operator = await csm.functions.getNodeOperator(event.args["nodeOperatorId"]).call(
             block_identifier=event.block - 1)
