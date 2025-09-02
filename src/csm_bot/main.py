@@ -2,7 +2,6 @@ import asyncio
 import logging
 import os
 from collections import defaultdict
-from itertools import chain
 from pathlib import Path
 
 import httpx
@@ -27,7 +26,7 @@ from csm_bot.texts import (
     UNFOLLOW_NODE_OPERATOR_TEXT, UNFOLLOW_NODE_OPERATOR_NOT_FOLLOWING,
     NODE_OPERATOR_FOLLOWED, NODE_OPERATOR_UNFOLLOWED, UNFOLLOW_NODE_OPERATOR_FOLLOWING, FOLLOW_NODE_OPERATOR_FOLLOWING,
     WELCOME_TEXT, NODE_OPERATOR_CANT_UNFOLLOW, NODE_OPERATOR_CANT_FOLLOW, EVENT_MESSAGES, EVENT_DESCRIPTIONS,
-    BUTTON_BACK, START_BUTTON_EVENTS, EVENT_LIST_TEXT,
+    BUTTON_BACK, START_BUTTON_EVENTS, EVENT_LIST_TEXT, START_BUTTON_ADMIN, ADMIN_BUTTON_SUBSCRIPTIONS, ADMIN_MENU_TEXT,
 )
 
 logging.basicConfig(
@@ -45,6 +44,7 @@ class States:
     FOLLOW_NODE_OPERATOR = "2"
     UNFOLLOW_NODE_OPERATOR = "3"
     FOLLOWED_EVENTS = "4"
+    ADMIN = "5"
 
 
 class Callback:
@@ -52,6 +52,8 @@ class Callback:
     UNFOLLOW_FROM_NODE_OPERATOR = "2"
     FOLLOWED_EVENTS = "3"
     BACK = "4"
+    ADMIN = "5"
+    ADMIN_SUBSCRIPTIONS = "6"
 
 
 class TelegramSubscription(Subscription):
@@ -186,6 +188,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton(START_BUTTON_EVENTS, callback_data=Callback.FOLLOWED_EVENTS),
         ],
     ]
+    if is_admin(update.effective_user.id, context):
+        keyboard.append([InlineKeyboardButton(START_BUTTON_ADMIN, callback_data=Callback.ADMIN)])
 
     text = WELCOME_TEXT
     node_operator_ids = sorted(context.chat_data.get('node_operators', {}))
@@ -209,6 +213,8 @@ async def start_over(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton(START_BUTTON_EVENTS, callback_data=Callback.FOLLOWED_EVENTS),
         ],
     ]
+    if is_admin(update.effective_user.id, context):
+        keyboard.append([InlineKeyboardButton(START_BUTTON_ADMIN, callback_data=Callback.ADMIN)])
 
     text = WELCOME_TEXT
     node_operator_ids = sorted(context.chat_data.get('node_operators', {}))
@@ -314,6 +320,20 @@ async def followed_events(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return States.FOLLOWED_EVENTS
 
 
+async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(update.effective_user.id, context):
+        await query.edit_message_text(text="Not authorized.")
+        return States.WELCOME
+    keyboard = [
+        [InlineKeyboardButton(ADMIN_BUTTON_SUBSCRIPTIONS, callback_data=Callback.ADMIN_SUBSCRIPTIONS)],
+        [InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)],
+    ]
+    await query.edit_message_text(text=ADMIN_MENU_TEXT, reply_markup=InlineKeyboardMarkup(keyboard))
+    return States.ADMIN
+
+
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update is None:
         logger.error("A %s occurred: %s", context.error.__class__.__name__, context.error)
@@ -334,6 +354,89 @@ subscription: TelegramSubscription
 event_messages: EventMessages
 job_context: JobContext
 
+
+def get_admin_ids_from_env() -> set[int]:
+    """Parse ADMIN_IDS env var to a set of ints. Accepts comma/space-separated values."""
+    raw = os.getenv("ADMIN_IDS", "")
+    ids: set[int] = set()
+    for token in raw.replace(" ", ",").split(","):
+        if not token:
+            continue
+        try:
+            ids.add(int(token))
+        except ValueError:
+            logger.warning("Ignoring invalid ADMIN_IDS entry: %s", token)
+    return ids
+
+
+def is_admin(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Return True if the given Telegram user_id is an admin."""
+    return user_id in context.application.bot_data.get("admin_ids", set())
+
+
+def get_active_subscription_counts(bot_data: dict) -> dict[str, dict[str, int]]:
+    """Compute active subscription counts per node operator, broken down by chat type.
+
+    Returns a mapping: { no_id (str): { 'total': int, 'users': int, 'groups': int, 'channels': int } }
+    Only includes operators with total > 0.
+    """
+    user_ids = bot_data.get("user_ids", set())
+    group_ids = bot_data.get("group_ids", set())
+    channel_ids = bot_data.get("channel_ids", set())
+    actual_chat_ids = user_ids.union(group_ids).union(channel_ids)
+
+    results: dict[str, dict[str, int]] = {}
+    for no_id, chats in bot_data.get("no_ids_to_chats", {}).items():
+        active = chats.intersection(actual_chat_ids)
+        if not active:
+            continue
+        users = sum(1 for c in active if c in user_ids)
+        groups = sum(1 for c in active if c in group_ids)
+        channels = sum(1 for c in active if c in channel_ids)
+        results[no_id] = {
+            "total": len(active),
+            "users": users,
+            "groups": groups,
+            "channels": channels,
+        }
+    return results
+
+
+async def subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin-only: list node operators that currently have subscribers (no chat IDs)."""
+    # Support both command and callback usage; answer callback if present
+    query = update.callback_query
+    if query is not None:
+        await query.answer()
+    user_id = update.effective_user.id if update.effective_user else None
+    if not user_id or not is_admin(user_id, context):
+        target_chat = query.message.chat_id if query and query.message else update.effective_chat.id
+        await context.bot.send_message(chat_id=target_chat, text="Not authorized.")
+        return States.WELCOME
+
+    counts = get_active_subscription_counts(context.bot_data)
+    if not counts:
+        text = "No active subscriptions."
+    else:
+        # Sort by numeric node operator id when possible
+        def sort_key(k: str):
+            return (0, int(k)) if k.isdigit() else (1, k)
+
+        lines = ["Active subscriptions:"]
+        for no_id in sorted(counts.keys(), key=sort_key):
+            c = counts[no_id]
+            sub_word = "subscriber" if c["total"] == 1 else "subscribers"
+            lines.append(f"#{no_id}: {c['total']} {sub_word} (users:{c['users']}, groups:{c['groups']}, channels:{c['channels']})")
+        text = "\n".join(lines)
+    # Present in-admin menu with back button
+    keyboard = [[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]
+    if query is not None:
+        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard))
+        return States.ADMIN
+    else:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
+        return States.WELCOME
+
 async def main():
     await application.initialize()
     await application.start()
@@ -342,6 +445,8 @@ async def main():
         application.bot_data["no_ids_to_chats"] = defaultdict(set)
     if "block" not in application.bot_data:
         application.bot_data["block"] = 0
+    # Load admin IDs once at startup
+    application.bot_data["admin_ids"] = get_admin_ids_from_env()
     block_from = int(os.getenv("BLOCK_FROM", application.bot_data.get('block')))
     await job_context.schedule(application)
 
@@ -394,6 +499,7 @@ if __name__ == '__main__':
                 CallbackQueryHandler(follow_node_operator, pattern="^" + Callback.FOLLOW_TO_NODE_OPERATOR + "$"),
                 CallbackQueryHandler(unfollow_node_operator, pattern="^" + Callback.UNFOLLOW_FROM_NODE_OPERATOR + "$"),
                 CallbackQueryHandler(followed_events, pattern="^" + Callback.FOLLOWED_EVENTS + "$"),
+                CallbackQueryHandler(admin_menu, pattern="^" + Callback.ADMIN + "$"),
             ],
             States.FOLLOW_NODE_OPERATOR: [
                 CallbackQueryHandler(start_over, pattern="^" + Callback.BACK + "$"),
@@ -405,6 +511,10 @@ if __name__ == '__main__':
             ],
             States.FOLLOWED_EVENTS: [
                 CallbackQueryHandler(start_over, pattern="^" + Callback.BACK + "$"),
+            ],
+            States.ADMIN: [
+                CallbackQueryHandler(start_over, pattern="^" + Callback.BACK + "$"),
+                CallbackQueryHandler(subscriptions, pattern="^" + Callback.ADMIN_SUBSCRIPTIONS + "$"),
             ],
         },
         fallbacks=[CommandHandler("start", start)],

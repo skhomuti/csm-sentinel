@@ -63,3 +63,22 @@ In general, you don't need to set this variable.
 
 `BLOCK_BATCH_SIZE` controls how many blocks are fetched per RPC request when processing historical events.
 The default value is `10000`.
+
+## Admin access (ADMIN_IDS)
+
+Some maintenance commands are restricted to admins. To enable them, set your Telegram user ID in the `ADMIN_IDS` environment variable.
+
+How to find your Telegram user ID:
+- Open a chat with `@userinfobot`, send `/start`, and copy the numeric `Id` value.
+
+Configure the ID in your `.env`:
+
+```
+# Single admin
+ADMIN_IDS=123456789
+
+# Multiple admins (comma or space separated)
+ADMIN_IDS=123456789,987654321
+# or
+ADMIN_IDS=123456789 987654321
+```
