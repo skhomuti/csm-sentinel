@@ -315,6 +315,7 @@ class EventMessages:
         template: callable = EVENT_MESSAGES.get(event.event)
         if event.args['version'] != 2:
             return None
-        if event.address != self.csm_address:
+        # Normalize address comparison to avoid case-sensitivity issues
+        if event.address.lower() != self.csm_address.lower():
             return None
         return template() + self.footer(event)
