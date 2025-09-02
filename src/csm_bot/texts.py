@@ -1,7 +1,8 @@
-import os
-
 from aiogram.utils.formatting import Text, Bold, TextLink, Code
 from web3.constants import ADDRESS_ZERO
+from csm_bot.config import get_config
+
+CFG = get_config()
 
 markdown = lambda *args, **kwargs: Text(*args, **kwargs).as_markdown()
 nl = lambda x=2: "\n" * x
@@ -177,14 +178,14 @@ def node_operator_reward_address_changed(address):
 def stuck_signing_keys_count_changed(count):
     return markdown("🚨 ", Bold("Stuck keys reported"), nl(),
                     Code(count), " key(s) were not exited in time. Check ",
-                    TextLink("CSM UI", url=os.getenv("CSM_UI_URL")), " for more details")
+                    TextLink("CSM UI", url=CFG.csm_ui_url or ""), " for more details")
 
 
 @RegisterEventMessage("VettedSigningKeysCountDecreased")
 def vetted_signing_keys_count_decreased():
     return markdown("🚨 ", Bold("Vetted keys count decreased"), nl(),
                     "Consider removing invalid keys. Check ",
-                    TextLink("CSM UI", url=os.getenv("CSM_UI_URL")), " for more details")
+                    TextLink("CSM UI", url=CFG.csm_ui_url or ""), " for more details")
 
 
 @RegisterEventMessage("WithdrawalSubmitted")
@@ -192,7 +193,7 @@ def withdrawal_submitted(key, key_url, amount):
     return markdown("👀 ", Bold("Information about validator withdrawal has been submitted"), nl(),
                     "Withdrawn key: ", TextLink(key, url=key_url),
                     " with exit balance: ", Code(amount), nl(),
-                    "Check the amount of the bond released at ", TextLink("CSM UI", url=os.getenv("CSM_UI_URL")))
+                    "Check the amount of the bond released at ", TextLink("CSM UI", url=CFG.csm_ui_url or ""))
 
 
 @RegisterEventMessage("TotalSigningKeysCountChanged")
@@ -225,7 +226,7 @@ def public_release():
 @RegisterEventMessage("DistributionLogUpdated")
 def distribution_data_updated():
     return markdown("📈 ", Bold("Rewards distributed!"), nl(),
-                    "Follow the ", TextLink("CSM UI", url=os.getenv("CSM_UI_URL")),
+                    "Follow the ", TextLink("CSM UI", url=CFG.csm_ui_url or ""),
                     " to check new claimable rewards.")
 
 

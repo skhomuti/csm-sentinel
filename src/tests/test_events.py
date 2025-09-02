@@ -93,7 +93,8 @@ async def test_ipfs_distribution_filter_with_matching_operator(mock_get):
         event="DistributionLogUpdated",
         args={"logCid": "QmTestHash123"},
         block=123456,
-        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234")
+        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234"),
+        address="0x0000000000000000000000000000000000000000",
     )
     
     # Test the filter
@@ -137,7 +138,8 @@ async def test_ipfs_distribution_filter_with_non_matching_operator(mock_get):
         event="DistributionLogUpdated",
         args={"logCid": "QmTestHash123"},
         block=123456,
-        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234")
+        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234"),
+        address="0x0000000000000000000000000000000000000000",
     )
     
     # Test the filter
@@ -181,7 +183,8 @@ async def test_ipfs_distribution_filter_caches_data(mock_get):
         event="DistributionLogUpdated",
         args={"logCid": "QmTestHash123"},
         block=123456,
-        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234")
+        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234"),
+        address="0x0000000000000000000000000000000000000000",
     )
     
     # Test the filter multiple times with same event
@@ -227,7 +230,8 @@ async def test_ipfs_distribution_filter_handles_http_error(mock_get):
         event="DistributionLogUpdated",
         args={"logCid": "QmTestHash123"},
         block=123456,
-        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234")
+        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234"),
+        address="0x0000000000000000000000000000000000000000",
     )
     
     # Test the filter
@@ -255,7 +259,8 @@ async def test_ipfs_distribution_filter_handles_missing_tree_cid():
         event="DistributionLogUpdated", 
         args={"someOtherField": "value"},  # No logCid
         block=123456,
-        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234")
+        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234"),
+        address="0x0000000000000000000000000000000000000000",
     )
     
     # Test the filter
@@ -296,7 +301,8 @@ async def test_ipfs_distribution_filter_handles_empty_operators(mock_get):
         event="DistributionLogUpdated",
         args={"logCid": "QmTestHash123"},
         block=123456,
-        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234")
+        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234"),
+        address="0x0000000000000000000000000000000000000000",
     )
     
     # Test the filter
@@ -331,7 +337,8 @@ async def test_ipfs_distribution_filter_handles_timeout(mock_get):
         event="DistributionLogUpdated",
         args={"logCid": "QmTestHash123"},
         block=123456,
-        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234")
+        tx=HexBytes("0x1234567890123456789012345678901234567890123456789012345678901234"),
+        address="0x0000000000000000000000000000000000000000",
     )
     
     # Test the filter

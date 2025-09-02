@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+These are the core guidelines for working in this repository.
+
 ## Project Structure & Modules
 - `src/csm_bot/`: Bot logic (Telegram handlers, event parsing, RPC subscriptions).
 - `src/tests/`: Pytest suite (unit/async tests, mocks).
@@ -9,7 +11,7 @@
 - `.env.sample.*`: Example environment files. Copy to `.env` for local runs.
 
 ## Build, Test, and Dev Commands
-- Test: `uv run pytest -q` (or `source .venv/bin/activate && pytest -q`).
+- Test: `uv run pytest -q`
 - Run locally: `uv run python src/csm_bot/main.py` (requires `.env`).
 - Docker: `docker compose up -d` (or `docker compose -f docker-compose-ethd.yml up -d` when co‑running with eth-docker).
 
@@ -33,4 +35,32 @@
 - Never commit secrets. Use `.env` locally; base it on `.env.sample.*`.
 - Key envs: `TOKEN`, `WEB3_SOCKET_PROVIDER`, contract addresses (CSM/ACCOUNTING/FEE_DISTRIBUTOR/VEBO), and URLs (`ETHERSCAN_URL`, `BEACONCHAIN_URL`, `CSM_UI_URL`).
 - Persistence path is `.storage/persistence.pkl` (mounted volume in Docker).
- - Admins: `ADMIN_IDS` (comma- or space-separated Telegram user IDs) to restrict admin-only commands.
+- Admins: `ADMIN_IDS` (comma- or space-separated Telegram user IDs) to restrict admin-only commands.
+
+# Agents Guide
+
+This document captures practical conventions for working with this repo using agent tooling.
+
+## Config & Env Access
+- Prefer `get_config()` from `csm_bot.config` over ad‑hoc `os.getenv(...)`.
+- Import once and reuse a module‑level `CFG = get_config()`.
+- For tests that tweak env vars, call `get_config.cache_clear()` before re‑reading.
+- When new envs are introduced, add them to `Config`, update `.env.sample.*`, and use `CFG` everywhere.
+
+## Chain Reads & Versioning
+- Always read contract state at the event’s block: pass `block_identifier=event.block`.
+- Where pre‑state is needed, use `event.block - 1` intentionally and document it in code.
+
+## Logging
+- No `print`; use module‑level `logger` with structured context.
+- Warn rather than fail for recoverable issues (e.g., version probe failures, optional filters).
+
+## Typing
+- Use built‑in types for unions and generics: `str | None`, `set[int]` (Python ≥ 3.11).
+- Prefer precise types on public helpers; keep handlers small and focused.
+
+## Adding Events/ABIs
+- Place new ABIs under `abi/` and import them in `models.py`.
+- Extend `EVENTS_TO_FOLLOW` via decorators in `events.py` and add matching entries in `texts.py` and `EVENT_DESCRIPTIONS`.
+- Ensure `rpc.py` subscriptions/topics include the relevant ABIs and addresses from `CFG`.
+- Maintain the invariant checked in `main.py` that events, messages, and descriptions are in sync.

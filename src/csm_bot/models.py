@@ -1,10 +1,12 @@
 import dataclasses
 import json
-import os
 
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 
+from csm_bot.config import get_config
+
+CFG = get_config()
 
 CSM_ABI = json.load(open("abi/CSModule.json"))
 CSM_V2_ABI = json.load(open("abi/CSModuleV2.json"))
@@ -18,9 +20,9 @@ FEE_DISTRIBUTOR_V2_ABI = json.load(open("abi/CSFeeDistributorV2.json"))
 PARAMETERS_REGISTRY_ABI = json.load(open("abi/CSParametersRegistry.json"))
 VEBO_ABI = json.load(open("abi/VEBO.json"))
 
-ETHERSCAN_BLOCK_URL_TEMPLATE = os.getenv("ETHERSCAN_URL") + "/block/{}"
-ETHERSCAN_TX_URL_TEMPLATE = os.getenv("ETHERSCAN_URL") + "/tx/{}"
-BEACONCHAIN_URL_TEMPLATE = os.getenv("BEACONCHAIN_URL") + "/validator/{}"
+ETHERSCAN_BLOCK_URL_TEMPLATE = CFG.etherscan_block_url_template
+ETHERSCAN_TX_URL_TEMPLATE = CFG.etherscan_tx_url_template
+BEACONCHAIN_URL_TEMPLATE = CFG.beaconchain_url_template
 
 
 @dataclasses.dataclass
