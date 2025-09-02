@@ -410,7 +410,7 @@ async def subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
     user_id = update.effective_user.id if update.effective_user else None
     if not user_id or not is_admin(user_id, context):
-        target_chat = query.message.chat_id if query else update.effective_chat.id
+        target_chat = query.message.chat_id if query and query.message else update.effective_chat.id
         await context.bot.send_message(chat_id=target_chat, text="Not authorized.")
         return States.WELCOME
 
