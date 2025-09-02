@@ -405,7 +405,7 @@ def get_active_subscription_counts(bot_data: dict) -> dict[str, dict[str, int]]:
 async def subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin-only: list node operators that currently have subscribers (no chat IDs)."""
     # Support both command and callback usage; answer callback if present
-    query = getattr(update, "callback_query", None)
+    query = update.callback_query
     if query is not None:
         await query.answer()
     user_id = update.effective_user.id if update.effective_user else None
