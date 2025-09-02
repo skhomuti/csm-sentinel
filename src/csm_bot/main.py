@@ -28,6 +28,7 @@ from csm_bot.texts import (
     WELCOME_TEXT, NODE_OPERATOR_CANT_UNFOLLOW, NODE_OPERATOR_CANT_FOLLOW, EVENT_MESSAGES, EVENT_DESCRIPTIONS,
     BUTTON_BACK, START_BUTTON_EVENTS, EVENT_LIST_TEXT, START_BUTTON_ADMIN, ADMIN_BUTTON_SUBSCRIPTIONS, ADMIN_MENU_TEXT,
 )
+from csm_bot.utils import chunk_text
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -415,8 +416,9 @@ async def subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return States.WELCOME
 
     counts = get_active_subscription_counts(context.bot_data)
+
     if not counts:
-        text = "No active subscriptions."
+        full_text = "No active subscriptions."
     else:
         # Sort by numeric node operator id when possible
         def sort_key(k: str):
@@ -426,15 +428,35 @@ async def subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for no_id in sorted(counts.keys(), key=sort_key):
             c = counts[no_id]
             sub_word = "subscriber" if c["total"] == 1 else "subscribers"
-            lines.append(f"#{no_id}: {c['total']} {sub_word} (users:{c['users']}, groups:{c['groups']}, channels:{c['channels']})")
-        text = "\n".join(lines)
-    # Present in-admin menu with back button
-    keyboard = [[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]
+            lines.append(
+                f"#{no_id}: {c['total']} {sub_word} (users:{c['users']}, groups:{c['groups']}, channels:{c['channels']})"
+            )
+        full_text = "\n".join(lines)
+
+    chunks = chunk_text(full_text)
+    back_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]])
+
     if query is not None:
-        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard))
+        chat_id = query.message.chat_id if query.message else update.effective_chat.id
+        if len(chunks) == 1:
+            # Single message: keep Back on this one
+            await query.edit_message_text(text=chunks[0], reply_markup=back_keyboard)
+        else:
+            # Multi-part: first chunk without Back (clear keyboard), intermediates without Back, last with Back
+            await query.edit_message_text(text=chunks[0], reply_markup=None)
+            for chunk in chunks[1:-1]:
+                await context.bot.send_message(chat_id=chat_id, text=chunk)
+            await context.bot.send_message(chat_id=chat_id, text=chunks[-1], reply_markup=back_keyboard)
         return States.ADMIN
     else:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
+        # Command path: send chunks and put Back only on the last one
+        chat_id = update.effective_chat.id
+        if len(chunks) == 1:
+            await context.bot.send_message(chat_id=chat_id, text=chunks[0], reply_markup=back_keyboard)
+        else:
+            for chunk in chunks[:-1]:
+                await context.bot.send_message(chat_id=chat_id, text=chunk)
+            await context.bot.send_message(chat_id=chat_id, text=chunks[-1], reply_markup=back_keyboard)
         return States.WELCOME
 
 async def main():
