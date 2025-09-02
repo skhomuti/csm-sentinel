@@ -27,6 +27,8 @@ from csm_bot.texts import (
     NODE_OPERATOR_FOLLOWED, NODE_OPERATOR_UNFOLLOWED, UNFOLLOW_NODE_OPERATOR_FOLLOWING, FOLLOW_NODE_OPERATOR_FOLLOWING,
     WELCOME_TEXT, NODE_OPERATOR_CANT_UNFOLLOW, NODE_OPERATOR_CANT_FOLLOW, EVENT_MESSAGES, EVENT_DESCRIPTIONS,
     BUTTON_BACK, START_BUTTON_EVENTS, EVENT_LIST_TEXT, START_BUTTON_ADMIN, ADMIN_BUTTON_SUBSCRIPTIONS, ADMIN_MENU_TEXT,
+    ADMIN_BUTTON_BROADCAST, ADMIN_BROADCAST_MENU_TEXT, ADMIN_BROADCAST_ALL, ADMIN_BROADCAST_BY_NO,
+    ADMIN_BROADCAST_ENTER_MESSAGE_ALL, ADMIN_BROADCAST_ENTER_NO_IDS, ADMIN_BROADCAST_NO_IDS_INVALID,
 )
 from csm_bot.utils import chunk_text
 
@@ -46,6 +48,10 @@ class States:
     UNFOLLOW_NODE_OPERATOR = "3"
     FOLLOWED_EVENTS = "4"
     ADMIN = "5"
+    ADMIN_BROADCAST = "6"
+    ADMIN_BROADCAST_MESSAGE_ALL = "7"
+    ADMIN_BROADCAST_SELECT_NO = "8"
+    ADMIN_BROADCAST_MESSAGE_SELECTED = "9"
 
 
 class Callback:
@@ -55,6 +61,9 @@ class Callback:
     BACK = "4"
     ADMIN = "5"
     ADMIN_SUBSCRIPTIONS = "6"
+    ADMIN_BROADCAST = "7"
+    ADMIN_BROADCAST_ALL = "8"
+    ADMIN_BROADCAST_BY_NO = "9"
 
 
 class TelegramSubscription(Subscription):
@@ -329,6 +338,7 @@ async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return States.WELCOME
     keyboard = [
         [InlineKeyboardButton(ADMIN_BUTTON_SUBSCRIPTIONS, callback_data=Callback.ADMIN_SUBSCRIPTIONS)],
+        [InlineKeyboardButton(ADMIN_BUTTON_BROADCAST, callback_data=Callback.ADMIN_BROADCAST)],
         [InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)],
     ]
     await query.edit_message_text(text=ADMIN_MENU_TEXT, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -402,6 +412,145 @@ def get_active_subscription_counts(bot_data: dict) -> dict[str, dict[str, int]]:
         }
     return results
 
+
+def _get_actual_chat_ids(bot_data: dict) -> set[int]:
+    """Return the set of chat IDs where the bot is currently present."""
+    return (
+        bot_data.get("user_ids", set())
+        .union(bot_data.get("group_ids", set()))
+        .union(bot_data.get("channel_ids", set()))
+    )
+
+
+def _resolve_target_chats_for_node_operators(bot_data: dict, node_operator_ids: set[str]) -> set[int]:
+    """Return target chats that subscribed to any of the provided node operator IDs."""
+    actual = _get_actual_chat_ids(bot_data)
+    targets: set[int] = set()
+    for no_id in node_operator_ids:
+        chats = bot_data.get("no_ids_to_chats", {}).get(no_id, set())
+        if chats:
+            targets.update(chats)
+    return targets.intersection(actual)
+
+
+async def _broadcast_to_chats(context: ContextTypes.DEFAULT_TYPE, chats: set[int], text: str) -> tuple[int, int]:
+    """Send text to each chat; returns (sent, failed)."""
+    sent, failed = 0, 0
+    for chat_id in chats:
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=text)
+            sent += 1
+        except Exception as e:  # pragma: no cover - depends on Telegram runtime
+            logger.error("Broadcast error to %s: %s", chat_id, e)
+            failed += 1
+    return sent, failed
+
+async def broadcast_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(update.effective_user.id, context):
+        await query.edit_message_text(text="Not authorized.")
+        return States.WELCOME
+    keyboard = [
+        [InlineKeyboardButton(ADMIN_BROADCAST_ALL, callback_data=Callback.ADMIN_BROADCAST_ALL)],
+        [InlineKeyboardButton(ADMIN_BROADCAST_BY_NO, callback_data=Callback.ADMIN_BROADCAST_BY_NO)],
+        [InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)],
+    ]
+    await query.edit_message_text(text=ADMIN_BROADCAST_MENU_TEXT, reply_markup=InlineKeyboardMarkup(keyboard))
+    return States.ADMIN_BROADCAST
+
+
+async def broadcast_all_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(update.effective_user.id, context):
+        await query.edit_message_text(text="Not authorized.")
+        return States.WELCOME
+    keyboard = [[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]
+    await query.edit_message_text(text=ADMIN_BROADCAST_ENTER_MESSAGE_ALL, reply_markup=InlineKeyboardMarkup(keyboard))
+    return States.ADMIN_BROADCAST_MESSAGE_ALL
+
+
+async def broadcast_all_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.message
+    text = message.text.strip()
+    if not text:
+        await message.reply_text(ADMIN_BROADCAST_ENTER_MESSAGE_ALL,
+                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+        return States.ADMIN_BROADCAST_MESSAGE_ALL
+    # Collect target chats
+    bot_data = context.bot_data
+    all_subscribed: set[int] = set()
+    for chats in bot_data.get("no_ids_to_chats", {}).values():
+        all_subscribed.update(chats)
+    targets = all_subscribed.intersection(_get_actual_chat_ids(bot_data))
+    if not targets:
+        await message.reply_text("No subscribers to notify.",
+                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+        return States.ADMIN_BROADCAST_MESSAGE_ALL
+    sent, failed = await _broadcast_to_chats(context, targets, text)
+    await message.reply_text(f"Broadcast sent to {sent} chat(s). Failures: {failed}.",
+                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+    return States.ADMIN_BROADCAST_MESSAGE_ALL
+
+
+async def broadcast_enter_no_ids_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.message
+    raw = (message.text or "").strip()
+    raw = raw.replace("#", "").replace(" ", ",")
+    ids: set[str] = set()
+    for token in filter(None, (t.strip() for t in raw.split(","))):
+        if token.isdigit():
+            ids.add(token)
+    if not ids:
+        await message.reply_text(ADMIN_BROADCAST_NO_IDS_INVALID,
+                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+        return States.ADMIN_BROADCAST_SELECT_NO
+    context.user_data["broadcast_selected"] = ids
+    pretty_ids = ", ".join(sorted(f"#{i}" for i in ids))
+    await message.reply_text(f"Enter message for: {pretty_ids}",
+                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+    return States.ADMIN_BROADCAST_MESSAGE_SELECTED
+
+
+async def broadcast_by_no(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin(update.effective_user.id, context):
+        await query.edit_message_text(text="Not authorized.")
+        return States.WELCOME
+    # Prompt for comma-separated NO IDs
+    context.user_data.pop("broadcast_selected", None)
+    keyboard = [[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]
+    await query.edit_message_text(text=ADMIN_BROADCAST_ENTER_NO_IDS, reply_markup=InlineKeyboardMarkup(keyboard))
+    return States.ADMIN_BROADCAST_SELECT_NO
+
+
+# Removed button-based NO selection in favor of text input of IDs.
+
+
+async def broadcast_selected_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.message
+    text = message.text.strip()
+    selected: set[str] = context.user_data.get("broadcast_selected", set())
+    if not selected:
+        await message.reply_text("No node operators selected.",
+                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+        return States.ADMIN_BROADCAST_SELECT_NO
+    if not text:
+        await message.reply_text("Message text is required.",
+                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+        return States.ADMIN_BROADCAST_MESSAGE_SELECTED
+    targets = _resolve_target_chats_for_node_operators(context.bot_data, selected)
+    if not targets:
+        await message.reply_text("No active subscribers for the selected node operators.",
+                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+        return States.ADMIN_BROADCAST_MESSAGE_SELECTED
+    sent, failed = await _broadcast_to_chats(context, targets, text)
+    pretty_ids = ", ".join(sorted(f"#{i}" for i in selected))
+    await message.reply_text(f"Broadcast to {pretty_ids}: sent to {sent} chat(s). Failures: {failed}.",
+                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+    return States.ADMIN_BROADCAST_MESSAGE_SELECTED
 
 async def subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin-only: list node operators that currently have subscribers (no chat IDs)."""
@@ -537,6 +686,24 @@ if __name__ == '__main__':
             States.ADMIN: [
                 CallbackQueryHandler(start_over, pattern="^" + Callback.BACK + "$"),
                 CallbackQueryHandler(subscriptions, pattern="^" + Callback.ADMIN_SUBSCRIPTIONS + "$"),
+                CallbackQueryHandler(broadcast_menu, pattern="^" + Callback.ADMIN_BROADCAST + "$"),
+            ],
+            States.ADMIN_BROADCAST: [
+                CallbackQueryHandler(start_over, pattern="^" + Callback.BACK + "$"),
+                CallbackQueryHandler(broadcast_all_prompt, pattern="^" + Callback.ADMIN_BROADCAST_ALL + "$"),
+                CallbackQueryHandler(broadcast_by_no, pattern="^" + Callback.ADMIN_BROADCAST_BY_NO + "$"),
+            ],
+            States.ADMIN_BROADCAST_MESSAGE_ALL: [
+                CallbackQueryHandler(broadcast_menu, pattern="^" + Callback.BACK + "$"),
+                MessageHandler(filters.TEXT, broadcast_all_message),
+            ],
+            States.ADMIN_BROADCAST_SELECT_NO: [
+                CallbackQueryHandler(broadcast_menu, pattern="^" + Callback.BACK + "$"),
+                MessageHandler(filters.TEXT, broadcast_enter_no_ids_message),
+            ],
+            States.ADMIN_BROADCAST_MESSAGE_SELECTED: [
+                CallbackQueryHandler(broadcast_by_no, pattern="^" + Callback.BACK + "$"),
+                MessageHandler(filters.TEXT, broadcast_selected_message),
             ],
         },
         fallbacks=[CommandHandler("start", start)],

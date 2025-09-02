@@ -82,3 +82,11 @@ ADMIN_IDS=123456789,987654321
 # or
 ADMIN_IDS=123456789 987654321
 ```
+
+### Admin broadcasts
+
+Admins can broadcast messages via the in-bot Admin panel:
+
+- Open `Admin` → `Broadcast`.
+- Choose `All subscribers` to send a message to every chat subscribed to any node operator, then enter your message.
+- Or choose `By node operator` and enter comma-separated node operator IDs (e.g., `1,2,3`), then enter your message.
