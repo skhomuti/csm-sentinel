@@ -16,7 +16,8 @@ from web3.types import EventData, FilterParams
 from websockets import ConnectionClosed
 
 from csm_bot.events import EVENTS_TO_FOLLOW
-from csm_bot.models import Event, Block, CSM_ABI, VEBO_ABI, FEE_DISTRIBUTOR_ABI
+from csm_bot.config import get_config
+from csm_bot.models import Event, Block, CSM_ABI, VEBO_ABI, FEE_DISTRIBUTOR_ABI, CSM_V2_ABI, FEE_DISTRIBUTOR_V2_ABI
 
 logger = logging.getLogger(__name__)
 logging.getLogger("web3.providers.persistent.subscription_manager").setLevel(logging.WARNING)
@@ -35,7 +36,8 @@ class Subscription:
         super().__init__()
         self._shutdown_event = asyncio.Event()
         self._w3 = w3
-        self.abi_by_topics = topics_to_follow(CSM_ABI, FEE_DISTRIBUTOR_ABI, VEBO_ABI)
+        self.abi_by_topics = topics_to_follow(CSM_ABI, CSM_V2_ABI, FEE_DISTRIBUTOR_ABI, FEE_DISTRIBUTOR_V2_ABI, VEBO_ABI)
+        self.cfg = get_config()
 
     @property
     async def w3(self):
@@ -77,26 +79,27 @@ class Subscription:
 
     @staticmethod
     def _filter_vebo_exit_requests(event: Event):
-        return event.args["stakingModuleId"] == int(os.getenv("CSM_STAKING_MODULE_ID"))
+        cfg = get_config()
+        return cfg.csm_staking_module_id is not None and event.args["stakingModuleId"] == cfg.csm_staking_module_id
 
     @reconnect
     async def subscribe(self):
         async for w3 in self.w3:
-            vebo = w3.eth.contract(address=os.getenv("VEBO_ADDRESS"), abi=VEBO_ABI)
-            fee_distributor = w3.eth.contract(address=os.getenv("FEE_DISTRIBUTOR_ADDRESS"), abi=FEE_DISTRIBUTOR_ABI)
+            vebo = w3.eth.contract(address=self.cfg.vebo_address, abi=VEBO_ABI)
+            fee_distributor = w3.eth.contract(address=self.cfg.fee_distributor_address, abi=FEE_DISTRIBUTOR_ABI)
 
             subs_csm = LogsSubscription(
-                address=os.getenv("CSM_ADDRESS"),
+                address=self.cfg.csm_address,
                 handler=self._handle_event_log_subscription
             )
             subs_vebo = LogsSubscription(
-                address=os.getenv("VEBO_ADDRESS"),
+                address=self.cfg.vebo_address,
                 topics=[vebo.events.ValidatorExitRequest().topic],
                 handler=self._handle_event_log_subscription,
                 handler_context={"predicate": self._filter_vebo_exit_requests}
             )
             subs_fd = LogsSubscription(
-                address=os.getenv("FEE_DISTRIBUTOR_ADDRESS"),
+                address=self.cfg.fee_distributor_address,
                 topics=[fee_distributor.events.DistributionLogUpdated().topic],
                 handler=self._handle_event_log_subscription
             )
@@ -117,13 +120,13 @@ class Subscription:
             logger.info("No blocks to process")
             return
         logger.info("Processing blocks from %s to %s", start_block, current_block)
-        batch_size = int(os.getenv("BLOCK_BATCH_SIZE", 10_000))
+        batch_size = self.cfg.block_batch_size
         for batch_start in range(start_block, current_block + 1, batch_size):
             batch_end = min(batch_start + batch_size - 1, current_block)
             for contract in [
-                os.getenv("CSM_ADDRESS"),
-                os.getenv("FEE_DISTRIBUTOR_ADDRESS"),
-                os.getenv("VEBO_ADDRESS"),
+                self.cfg.csm_address,
+                self.cfg.fee_distributor_address,
+                self.cfg.vebo_address,
             ]:
                 logger.debug(
                     "Fetching logs for %s blocks %s-%s",
@@ -148,8 +151,9 @@ class Subscription:
                         args=event_data["args"],
                         block=event_data["blockNumber"],
                         tx=event_data["transactionHash"],
+                        address=event_data["address"],
                     )
-                    if contract == os.getenv("VEBO_ADDRESS") and not self._filter_vebo_exit_requests(event):
+                    if contract == self.cfg.vebo_address and not self._filter_vebo_exit_requests(event):
                         continue
                     await self.process_event_log(event)
                     await asyncio.sleep(0)
@@ -170,7 +174,8 @@ class Subscription:
         event = Event(event=event_data["event"],
                       args=event_data["args"],
                       block=event_data["blockNumber"],
-                      tx=event_data["transactionHash"])
+                      tx=event_data["transactionHash"],
+                      address=event_data["address"])
         if hasattr(context, "predicate") and not context.predicate(event):
             return
         await self.process_event_log(event)

@@ -31,6 +31,7 @@ from csm_bot.texts import (
     ADMIN_BROADCAST_ENTER_MESSAGE_ALL, ADMIN_BROADCAST_ENTER_NO_IDS, ADMIN_BROADCAST_NO_IDS_INVALID,
 )
 from csm_bot.utils import chunk_text
+from csm_bot.config import get_config
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -93,6 +94,9 @@ class TelegramSubscription(Subscription):
         chats = chats.intersection(actual_chat_ids)
 
         message = await event_messages.get_event_message(event)
+        if message is None:
+            logger.warning("No message found for event %s", event.readable())
+            return
 
         sent_messages = 0
         for chat in chats:
@@ -364,20 +368,12 @@ application: Application
 subscription: TelegramSubscription
 event_messages: EventMessages
 job_context: JobContext
+CFG = get_config()
 
 
 def get_admin_ids_from_env() -> set[int]:
-    """Parse ADMIN_IDS env var to a set of ints. Accepts comma/space-separated values."""
-    raw = os.getenv("ADMIN_IDS", "")
-    ids: set[int] = set()
-    for token in raw.replace(" ", ",").split(","):
-        if not token:
-            continue
-        try:
-            ids.add(int(token))
-        except ValueError:
-            logger.warning("Ignoring invalid ADMIN_IDS entry: %s", token)
-    return ids
+    # Backward-compat shim; prefer using CFG.admin_ids elsewhere
+    return CFG.admin_ids
 
 
 def is_admin(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -618,7 +614,7 @@ async def main():
         application.bot_data["block"] = 0
     # Load admin IDs once at startup
     application.bot_data["admin_ids"] = get_admin_ids_from_env()
-    block_from = int(os.getenv("BLOCK_FROM", application.bot_data.get('block')))
+    block_from = CFG.block_from if CFG.block_from is not None else int(application.bot_data.get('block'))
     await job_context.schedule(application)
 
     logger.info("Bot started. Latest processed block number: %s", block_from)
@@ -646,19 +642,19 @@ if __name__ == '__main__':
     assert events == messages, "Missed events: " + str(events.symmetric_difference(messages))
     assert events == descriptions, "Missed events: " + str(events.symmetric_difference(descriptions))
 
-    storage_path = Path(os.getenv("FILESTORAGE_PATH", ".storage"))
+    storage_path = Path(CFG.filestorage_path)
     if not storage_path.exists():
         storage_path.mkdir(parents=True)
     persistence = PicklePersistence(filepath=storage_path / "persistence.pkl")
     application = (
         ApplicationBuilder()
-        .token(os.getenv("TOKEN"))
+        .token(CFG.token)
         .persistence(persistence)
         .rate_limiter(AIORateLimiter(max_retries=5))
         .build()
     )
-    persistent_provider = AsyncWeb3(WebSocketProvider(os.getenv("WEB3_SOCKET_PROVIDER"), max_connection_retries=-1))
-    rpc_provider = AsyncWeb3(WebSocketProvider(os.getenv("WEB3_SOCKET_PROVIDER"), max_connection_retries=-1))
+    persistent_provider = AsyncWeb3(WebSocketProvider(CFG.web3_socket_provider, max_connection_retries=-1))
+    rpc_provider = AsyncWeb3(WebSocketProvider(CFG.web3_socket_provider, max_connection_retries=-1))
     subscription = TelegramSubscription(persistent_provider, application)
     event_messages = EventMessages(rpc_provider)
     job_context = JobContext()
