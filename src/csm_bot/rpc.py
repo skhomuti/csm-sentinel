@@ -16,6 +16,7 @@ from web3.types import EventData, FilterParams
 from websockets import ConnectionClosed
 
 from csm_bot.events import EVENTS_TO_FOLLOW
+from csm_bot.utils import normalize_block_number
 from csm_bot.config import get_config
 from csm_bot.models import Event, Block, CSM_ABI, VEBO_ABI, FEE_DISTRIBUTOR_ABI, CSM_V2_ABI, FEE_DISTRIBUTOR_V2_ABI
 
@@ -162,7 +163,8 @@ class Subscription:
 
 
     async def _handle_new_block_subscription(self, context: NewHeadsSubscriptionContext):
-        await self.process_new_block(Block(number=context.result["number"]))
+        num = context.result["number"]
+        await self.process_new_block(Block(number=normalize_block_number(num)))
 
     async def _handle_event_log_subscription(self, context: LogsSubscriptionContext):
         event_topic = context.result["topics"][0]
