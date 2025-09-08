@@ -30,7 +30,7 @@ from csm_bot.texts import (
     ADMIN_BUTTON_BROADCAST, ADMIN_BROADCAST_MENU_TEXT, ADMIN_BROADCAST_ALL, ADMIN_BROADCAST_BY_NO,
     ADMIN_BROADCAST_ENTER_MESSAGE_ALL, ADMIN_BROADCAST_ENTER_NO_IDS, ADMIN_BROADCAST_NO_IDS_INVALID,
 )
-from csm_bot.utils import chunk_text
+from csm_bot.utils import chunk_text, normalize_block_number
 from csm_bot.config import get_config
 
 logging.basicConfig(
@@ -614,7 +614,7 @@ async def main():
         application.bot_data["block"] = 0
     # Load admin IDs once at startup
     application.bot_data["admin_ids"] = get_admin_ids_from_env()
-    block_from = CFG.block_from if CFG.block_from is not None else int(application.bot_data.get('block'))
+    block_from = CFG.block_from if CFG.block_from is not None else normalize_block_number(application.bot_data.get('block'))
     await job_context.schedule(application)
 
     logger.info("Bot started. Latest processed block number: %s", block_from)

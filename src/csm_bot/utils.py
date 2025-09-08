@@ -1,4 +1,26 @@
-from typing import List
+from typing import List, Any
+
+
+def normalize_block_number(value: Any) -> int:
+    """Normalize a block number to an `int`.
+
+    Accepts ints, decimal strings, and hex strings (e.g., '0x...').
+    Raises ValueError for empty/invalid inputs.
+    """
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            raise ValueError("Empty block number string")
+        try:
+            # base=0 allows '0x..' hex and plain decimals
+            return int(s, 0)
+        except ValueError:
+            # Fallback for non 0x-prefixed numerals
+            return int(s)
+    # Attempt a generic int conversion (e.g., for numpy types)
+    return int(value)
 
 
 def chunk_text(s: str, limit: int = 4000) -> List[str]:
