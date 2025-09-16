@@ -133,6 +133,24 @@ async def add_user_if_required(update: Update, context: ContextTypes.DEFAULT_TYP
     context.bot_data.setdefault("user_ids", set()).add(chat.id)
 
 
+async def _reply_with_markup(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    text: str,
+    reply_markup: InlineKeyboardMarkup | None = None,
+):
+    message = update.message
+    if message is not None:
+        await message.reply_text(text, reply_markup=reply_markup)
+        return
+
+    chat = update.effective_chat
+    if chat is not None:
+        await context.bot.send_message(chat_id=chat.id, text=text, reply_markup=reply_markup)
+    else:
+        logger.warning("Cannot send reply for update without message or chat: %s", update)
+
+
 def extract_status_change(chat_member_update: ChatMemberUpdated):
     """Takes a ChatMemberUpdated instance and extracts whether the 'old_chat_member' was a member
     of the chat and whether the 'new_chat_member' is a member of the chat. Returns None, if
@@ -263,6 +281,9 @@ async def follow_node_operator_message(update: Update, context: ContextTypes.DEF
         InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)
     ]
     message = update.message
+    if message is None or not message.text:
+        await _reply_with_markup(update, context, NODE_OPERATOR_CANT_FOLLOW, InlineKeyboardMarkup([keyboard]))
+        return States.FOLLOW_NODE_OPERATOR
     node_operator_id = message.text
     if node_operator_id.startswith("#"):
         node_operator_id = message.text[1:]
@@ -272,11 +293,15 @@ async def follow_node_operator_message(update: Update, context: ContextTypes.DEF
     if node_operator_id.isdigit() and int(node_operator_id) < node_operators_count:
         context.bot_data["no_ids_to_chats"][node_operator_id].add(message.chat_id)
         context.chat_data.setdefault("node_operators", set()).add(node_operator_id)
-        await message.reply_text(NODE_OPERATOR_FOLLOWED.format(node_operator_id),
-                                 reply_markup=InlineKeyboardMarkup([keyboard]))
+        await _reply_with_markup(
+            update,
+            context,
+            NODE_OPERATOR_FOLLOWED.format(node_operator_id),
+            InlineKeyboardMarkup([keyboard]),
+        )
         return States.FOLLOW_NODE_OPERATOR
     else:
-        await message.reply_text(NODE_OPERATOR_CANT_FOLLOW, reply_markup=InlineKeyboardMarkup([keyboard]))
+        await _reply_with_markup(update, context, NODE_OPERATOR_CANT_FOLLOW, InlineKeyboardMarkup([keyboard]))
         return States.FOLLOW_NODE_OPERATOR
 
 
@@ -303,6 +328,9 @@ async def unfollow_node_operator_message(update: Update, context: ContextTypes.D
     ]
 
     message = update.message
+    if message is None or not message.text:
+        await _reply_with_markup(update, context, NODE_OPERATOR_CANT_UNFOLLOW, InlineKeyboardMarkup([keyboard]))
+        return States.UNFOLLOW_NODE_OPERATOR
     node_operator_id = message.text
     if node_operator_id.startswith("#"):
         node_operator_id = message.text[1:]
@@ -311,11 +339,15 @@ async def unfollow_node_operator_message(update: Update, context: ContextTypes.D
         node_operator_ids.remove(node_operator_id)
         context.chat_data['node_operators'] = node_operator_ids
         context.bot_data["no_ids_to_chats"][node_operator_id].remove(message.chat_id)
-        await message.reply_text(NODE_OPERATOR_UNFOLLOWED.format(node_operator_id),
-                                 reply_markup=InlineKeyboardMarkup([keyboard]))
+        await _reply_with_markup(
+            update,
+            context,
+            NODE_OPERATOR_UNFOLLOWED.format(node_operator_id),
+            InlineKeyboardMarkup([keyboard]),
+        )
         return States.UNFOLLOW_NODE_OPERATOR
     else:
-        await message.reply_text(NODE_OPERATOR_CANT_UNFOLLOW, reply_markup=InlineKeyboardMarkup([keyboard]))
+        await _reply_with_markup(update, context, NODE_OPERATOR_CANT_UNFOLLOW, InlineKeyboardMarkup([keyboard]))
         return States.UNFOLLOW_NODE_OPERATOR
 
 
@@ -469,10 +501,22 @@ async def broadcast_all_prompt(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def broadcast_all_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
+    if message is None or not message.text:
+        await _reply_with_markup(
+            update,
+            context,
+            ADMIN_BROADCAST_ENTER_MESSAGE_ALL,
+            InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]),
+        )
+        return States.ADMIN_BROADCAST_MESSAGE_ALL
     text = message.text.strip()
     if not text:
-        await message.reply_text(ADMIN_BROADCAST_ENTER_MESSAGE_ALL,
-                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+        await _reply_with_markup(
+            update,
+            context,
+            ADMIN_BROADCAST_ENTER_MESSAGE_ALL,
+            InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]),
+        )
         return States.ADMIN_BROADCAST_MESSAGE_ALL
     # Collect target chats
     bot_data = context.bot_data
@@ -481,31 +525,55 @@ async def broadcast_all_message(update: Update, context: ContextTypes.DEFAULT_TY
         all_subscribed.update(chats)
     targets = all_subscribed.intersection(_get_actual_chat_ids(bot_data))
     if not targets:
-        await message.reply_text("No subscribers to notify.",
-                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+        await _reply_with_markup(
+            update,
+            context,
+            "No subscribers to notify.",
+            InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]),
+        )
         return States.ADMIN_BROADCAST_MESSAGE_ALL
     sent, failed = await _broadcast_to_chats(context, targets, text)
-    await message.reply_text(f"Broadcast sent to {sent} chat(s). Failures: {failed}.",
-                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+    await _reply_with_markup(
+        update,
+        context,
+        f"Broadcast sent to {sent} chat(s). Failures: {failed}.",
+        InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]),
+    )
     return States.ADMIN_BROADCAST_MESSAGE_ALL
 
 
 async def broadcast_enter_no_ids_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
-    raw = (message.text or "").strip()
+    if message is None or message.text is None:
+        await _reply_with_markup(
+            update,
+            context,
+            ADMIN_BROADCAST_NO_IDS_INVALID,
+            InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]),
+        )
+        return States.ADMIN_BROADCAST_SELECT_NO
+    raw = message.text.strip()
     raw = raw.replace("#", "").replace(" ", ",")
     ids: set[str] = set()
     for token in filter(None, (t.strip() for t in raw.split(","))):
         if token.isdigit():
             ids.add(token)
     if not ids:
-        await message.reply_text(ADMIN_BROADCAST_NO_IDS_INVALID,
-                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+        await _reply_with_markup(
+            update,
+            context,
+            ADMIN_BROADCAST_NO_IDS_INVALID,
+            InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]),
+        )
         return States.ADMIN_BROADCAST_SELECT_NO
     context.user_data["broadcast_selected"] = ids
     pretty_ids = ", ".join(sorted(f"#{i}" for i in ids))
-    await message.reply_text(f"Enter message for: {pretty_ids}",
-                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+    await _reply_with_markup(
+        update,
+        context,
+        f"Enter message for: {pretty_ids}",
+        InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]),
+    )
     return States.ADMIN_BROADCAST_MESSAGE_SELECTED
 
 
@@ -527,25 +595,49 @@ async def broadcast_by_no(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def broadcast_selected_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
+    if message is None or message.text is None:
+        await _reply_with_markup(
+            update,
+            context,
+            "Message text is required.",
+            InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]),
+        )
+        return States.ADMIN_BROADCAST_MESSAGE_SELECTED
     text = message.text.strip()
     selected: set[str] = context.user_data.get("broadcast_selected", set())
     if not selected:
-        await message.reply_text("No node operators selected.",
-                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+        await _reply_with_markup(
+            update,
+            context,
+            "No node operators selected.",
+            InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]),
+        )
         return States.ADMIN_BROADCAST_SELECT_NO
     if not text:
-        await message.reply_text("Message text is required.",
-                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+        await _reply_with_markup(
+            update,
+            context,
+            "Message text is required.",
+            InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]),
+        )
         return States.ADMIN_BROADCAST_MESSAGE_SELECTED
     targets = _resolve_target_chats_for_node_operators(context.bot_data, selected)
     if not targets:
-        await message.reply_text("No active subscribers for the selected node operators.",
-                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+        await _reply_with_markup(
+            update,
+            context,
+            "No active subscribers for the selected node operators.",
+            InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]),
+        )
         return States.ADMIN_BROADCAST_MESSAGE_SELECTED
     sent, failed = await _broadcast_to_chats(context, targets, text)
     pretty_ids = ", ".join(sorted(f"#{i}" for i in selected))
-    await message.reply_text(f"Broadcast to {pretty_ids}: sent to {sent} chat(s). Failures: {failed}.",
-                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]))
+    await _reply_with_markup(
+        update,
+        context,
+        f"Broadcast to {pretty_ids}: sent to {sent} chat(s). Failures: {failed}.",
+        InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK)]]),
+    )
     return States.ADMIN_BROADCAST_MESSAGE_SELECTED
 
 async def subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
