@@ -1,5 +1,6 @@
+from typing import TYPE_CHECKING
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ContextTypes
 
 from csm_bot.handlers.admin.common import admin_only
 from csm_bot.handlers.state import Callback, States
@@ -12,9 +13,11 @@ from csm_bot.texts import (
 )
 from csm_bot.utils import chunk_text
 
+if TYPE_CHECKING:
+    from csm_bot.app.context import BotContext
 
 @admin_only(States.WELCOME)
-async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+async def admin_menu(update: Update, context: "BotContext") -> States:
     query = update.callback_query
     if query is not None:
         await query.answer()
@@ -28,12 +31,12 @@ async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Stat
 
 
 @admin_only(States.WELCOME)
-async def subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def subscriptions(update: Update, context: "BotContext"):
     query = update.callback_query
     if query is not None:
         await query.answer()
 
-    counts = get_active_subscription_counts(context.bot_data)
+    counts = get_active_subscription_counts(context.bot_storage)
 
     if not counts:
         full_text = "No active subscriptions."

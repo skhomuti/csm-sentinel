@@ -1,10 +1,8 @@
-from collections import defaultdict
+from typing import TYPE_CHECKING
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
-from telegram.ext import ContextTypes
 
-from csm_bot.app.runtime import get_runtime_from_context
 from csm_bot.handlers.state import Callback, States
 from csm_bot.handlers.tracking import add_user_if_required
 from csm_bot.handlers.utils import is_admin, reply_with_markup
@@ -27,9 +25,13 @@ from csm_bot.texts import (
     WELCOME_TEXT,
 )
 
+if TYPE_CHECKING:
+    from csm_bot.app.context import BotContext
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+
+async def start(update: Update, context: "BotContext") -> States:
     await add_user_if_required(update, context)
+    chat_storage = context.chat_storage()
     keyboard = [
         [
             InlineKeyboardButton(START_BUTTON_FOLLOW, callback_data=Callback.FOLLOW_TO_NODE_OPERATOR.value),
@@ -41,7 +43,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
         keyboard.append([InlineKeyboardButton(START_BUTTON_ADMIN, callback_data=Callback.ADMIN.value)])
 
     text = WELCOME_TEXT
-    node_operator_ids = sorted(context.chat_data.get("node_operators", {}))
+    node_operator_ids = sorted(chat_storage.node_operators.ids())
     if node_operator_ids:
         text += FOLLOW_NODE_OPERATOR_FOLLOWING.format(", ".join(f"#{x}" for x in node_operator_ids)
         )
@@ -55,7 +57,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
     return States.WELCOME
 
 
-async def start_over(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+async def start_over(update: Update, context: "BotContext") -> States:
     keyboard = [
         [
             InlineKeyboardButton(START_BUTTON_FOLLOW, callback_data=Callback.FOLLOW_TO_NODE_OPERATOR.value),
@@ -67,7 +69,8 @@ async def start_over(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Stat
         keyboard.append([InlineKeyboardButton(START_BUTTON_ADMIN, callback_data=Callback.ADMIN.value)])
 
     text = WELCOME_TEXT
-    node_operator_ids = sorted(context.chat_data.get("node_operators", {}))
+    chat_storage = context.chat_storage()
+    node_operator_ids = sorted(chat_storage.node_operators.ids())
     if node_operator_ids:
         text += FOLLOW_NODE_OPERATOR_FOLLOWING.format(", ".join(f"#{x}" for x in node_operator_ids)
         )
@@ -80,11 +83,12 @@ async def start_over(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Stat
     return States.WELCOME
 
 
-async def follow_node_operator(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+async def follow_node_operator(update: Update, context: "BotContext") -> States:
     query = update.callback_query
     await query.answer()
 
-    node_operator_ids = sorted(context.chat_data.get("node_operators", {}))
+    chat_storage = context.chat_storage()
+    node_operator_ids = sorted(chat_storage.node_operators.ids())
     keyboard = [InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK.value)]
     text = FOLLOW_NODE_OPERATOR_TEXT
     if node_operator_ids:
@@ -96,7 +100,7 @@ async def follow_node_operator(update: Update, context: ContextTypes.DEFAULT_TYP
     return States.FOLLOW_NODE_OPERATOR
 
 
-async def follow_node_operator_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+async def follow_node_operator_message(update: Update, context: "BotContext") -> States:
     keyboard = [InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK.value)]
     message = update.message
     if message is None or not message.text:
@@ -112,14 +116,14 @@ async def follow_node_operator_message(update: Update, context: ContextTypes.DEF
     if node_operator_id.startswith("#"):
         node_operator_id = node_operator_id[1:]
 
-    runtime = get_runtime_from_context(context)
+    runtime = context.runtime
     async with runtime.event_messages.connectProvider:
         node_operators_count = await runtime.event_messages.csm.functions.getNodeOperatorsCount().call()
 
     if node_operator_id.isdigit() and int(node_operator_id) < node_operators_count:
-        no_ids_to_chats = context.bot_data.setdefault("no_ids_to_chats", defaultdict(set))
-        no_ids_to_chats[node_operator_id].add(message.chat_id)
-        context.chat_data.setdefault("node_operators", set()).add(node_operator_id)
+        chat_storage = context.chat_storage()
+        context.bot_storage.node_operator_chats.subscribe(node_operator_id, message.chat_id)
+        chat_storage.node_operators.follow(node_operator_id)
         await reply_with_markup(
             update,
             context,
@@ -137,11 +141,12 @@ async def follow_node_operator_message(update: Update, context: ContextTypes.DEF
     return States.FOLLOW_NODE_OPERATOR
 
 
-async def unfollow_node_operator(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+async def unfollow_node_operator(update: Update, context: "BotContext") -> States:
     query = update.callback_query
     await query.answer()
 
-    node_operator_ids = sorted(context.chat_data.get("node_operators", {}))
+    chat_storage = context.chat_storage()
+    node_operator_ids = sorted(chat_storage.node_operators.ids())
     keyboard = [InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK.value)]
     if node_operator_ids:
         text = UNFOLLOW_NODE_OPERATOR_FOLLOWING.format(", ".join(f"#{x}" for x in node_operator_ids))
@@ -152,7 +157,7 @@ async def unfollow_node_operator(update: Update, context: ContextTypes.DEFAULT_T
     return States.UNFOLLOW_NODE_OPERATOR
 
 
-async def unfollow_node_operator_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+async def unfollow_node_operator_message(update: Update, context: "BotContext") -> States:
     keyboard = [InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK.value)]
     message = update.message
     if message is None or not message.text:
@@ -167,12 +172,9 @@ async def unfollow_node_operator_message(update: Update, context: ContextTypes.D
     node_operator_id = message.text
     if node_operator_id.startswith("#"):
         node_operator_id = node_operator_id[1:]
-    node_operator_ids = context.chat_data.get("node_operators")
-    if node_operator_ids and node_operator_id in node_operator_ids:
-        node_operator_ids.remove(node_operator_id)
-        context.chat_data["node_operators"] = node_operator_ids
-        no_ids_to_chats = context.bot_data.setdefault("no_ids_to_chats", defaultdict(set))
-        no_ids_to_chats[node_operator_id].discard(message.chat_id)
+    chat_storage = context.chat_storage()
+    if chat_storage.node_operators.unfollow(node_operator_id):
+        context.bot_storage.node_operator_chats.unsubscribe(node_operator_id, message.chat_id)
         await reply_with_markup(
             update,
             context,
@@ -190,7 +192,7 @@ async def unfollow_node_operator_message(update: Update, context: ContextTypes.D
     return States.UNFOLLOW_NODE_OPERATOR
 
 
-async def followed_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+async def followed_events(update: Update, context: "BotContext") -> States:
     query = update.callback_query
     await query.answer()
 

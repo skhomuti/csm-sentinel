@@ -21,6 +21,7 @@ def test_event_readable_string():
 
 def test_main_subscription_helpers_counts():
     from src.csm_bot.handlers.utils import get_active_subscription_counts
+    from src.csm_bot.app.storage import BotStorage
 
     bot_data = {
         "user_ids": {1},
@@ -32,7 +33,8 @@ def test_main_subscription_helpers_counts():
         },
     }
 
-    counts = get_active_subscription_counts(bot_data)
+    storage = BotStorage(bot_data)
+    counts = get_active_subscription_counts(storage)
     assert counts["10"]["total"] == 2
     assert counts["10"]["users"] == 1
     assert counts["10"]["groups"] == 1
@@ -46,6 +48,7 @@ def test_main_subscription_helpers_counts():
 
 def test_main_resolve_target_chats():
     from src.csm_bot.handlers.utils import resolve_target_chats_for_node_operators
+    from src.csm_bot.app.storage import BotStorage
 
     bot_data = {
         "user_ids": {1},
@@ -56,7 +59,8 @@ def test_main_resolve_target_chats():
             "20": {2, 4},
         },
     }
-    targets = resolve_target_chats_for_node_operators(bot_data, {"10", "20"})
+    storage = BotStorage(bot_data)
+    targets = resolve_target_chats_for_node_operators(storage, {"10", "20"})
     assert targets == {1, 2}
 
 

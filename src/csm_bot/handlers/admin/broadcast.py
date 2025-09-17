@@ -1,16 +1,11 @@
 import logging
-from typing import Iterable, Set
+from typing import Iterable, TYPE_CHECKING
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ContextTypes
 
 from csm_bot.handlers.admin.common import admin_only
 from csm_bot.handlers.state import Callback, States
-from csm_bot.handlers.utils import (
-    get_actual_chat_ids,
-    reply_with_markup,
-    resolve_target_chats_for_node_operators,
-)
+from csm_bot.handlers.utils import reply_with_markup, resolve_target_chats_for_node_operators
 from csm_bot.texts import (
     ADMIN_BROADCAST_ALL,
     ADMIN_BROADCAST_BY_NO,
@@ -23,9 +18,12 @@ from csm_bot.texts import (
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from csm_bot.app.context import BotContext
+
 
 @admin_only(States.WELCOME)
-async def broadcast_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+async def broadcast_menu(update: Update, context: "BotContext") -> States:
     query = update.callback_query
     if query is not None:
         await query.answer()
@@ -39,7 +37,7 @@ async def broadcast_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 @admin_only(States.WELCOME)
-async def broadcast_all_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+async def broadcast_all_prompt(update: Update, context: "BotContext") -> States:
     query = update.callback_query
     if query is not None:
         await query.answer()
@@ -52,7 +50,7 @@ async def broadcast_all_prompt(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 @admin_only(States.WELCOME)
-async def broadcast_by_no(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+async def broadcast_by_no(update: Update, context: "BotContext") -> States:
     query = update.callback_query
     if query is not None:
         await query.answer()
@@ -66,7 +64,7 @@ async def broadcast_by_no(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 @admin_only(States.ADMIN_BROADCAST_MESSAGE_ALL)
-async def broadcast_all_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+async def broadcast_all_message(update: Update, context: "BotContext") -> States:
     message = update.message
     keyboard = [[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK.value)]]
     markup = InlineKeyboardMarkup(keyboard)
@@ -78,11 +76,8 @@ async def broadcast_all_message(update: Update, context: ContextTypes.DEFAULT_TY
         await reply_with_markup(update, context, ADMIN_BROADCAST_ENTER_MESSAGE_ALL, markup)
         return States.ADMIN_BROADCAST_MESSAGE_ALL
 
-    bot_data = context.bot_data
-    all_subscribed: Set[int] = set()
-    for chats in bot_data.get("no_ids_to_chats", {}).values():
-        all_subscribed.update(chats)
-    targets = all_subscribed.intersection(get_actual_chat_ids(bot_data))
+    bot_storage = context.bot_storage
+    targets = bot_storage.resolve_target_chats(bot_storage.node_operator_chats.ids())
     if not targets:
         await reply_with_markup(update, context, "No subscribers to notify.", markup)
         return States.ADMIN_BROADCAST_MESSAGE_ALL
@@ -97,7 +92,7 @@ async def broadcast_all_message(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 @admin_only(States.ADMIN_BROADCAST_SELECT_NO)
-async def broadcast_enter_no_ids_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+async def broadcast_enter_no_ids_message(update: Update, context: "BotContext") -> States:
     message = update.message
     keyboard = [[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK.value)]]
     markup = InlineKeyboardMarkup(keyboard)
@@ -125,7 +120,7 @@ async def broadcast_enter_no_ids_message(update: Update, context: ContextTypes.D
 
 
 @admin_only(States.ADMIN_BROADCAST_MESSAGE_SELECTED)
-async def broadcast_selected_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> States:
+async def broadcast_selected_message(update: Update, context: "BotContext") -> States:
     message = update.message
     keyboard = [[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK.value)]]
     markup = InlineKeyboardMarkup(keyboard)
@@ -147,7 +142,8 @@ async def broadcast_selected_message(update: Update, context: ContextTypes.DEFAU
         await reply_with_markup(update, context, "Message text is required.", markup)
         return States.ADMIN_BROADCAST_MESSAGE_SELECTED
 
-    targets = resolve_target_chats_for_node_operators(context.bot_data, selected)
+    bot_storage = context.bot_storage
+    targets = resolve_target_chats_for_node_operators(bot_storage, selected)
     if not targets:
         await reply_with_markup(
             update,
@@ -169,7 +165,7 @@ async def broadcast_selected_message(update: Update, context: ContextTypes.DEFAU
 
 
 async def _broadcast_to_chats(
-    context: ContextTypes.DEFAULT_TYPE,
+    context: "BotContext",
     chats: Iterable[int],
     text: str,
 ) -> tuple[int, int]:

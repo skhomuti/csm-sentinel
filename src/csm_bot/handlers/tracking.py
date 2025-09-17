@@ -1,24 +1,29 @@
 import logging
+from typing import TYPE_CHECKING
 
 from telegram import Chat, ChatMember, ChatMemberUpdated, Update
-from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from csm_bot.app.context import BotContext
 
-async def chat_migration(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+async def chat_migration(update: Update, context: "BotContext") -> None:
     message = update.message
     if message is not None:
         context.application.migrate_chat_data(message=message)
 
 
-async def add_user_if_required(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def add_user_if_required(update: Update, context: "BotContext") -> None:
     chat = update.effective_chat
-    if chat.type != Chat.PRIVATE or chat.id in context.bot_data.get("user_ids", set()):
+    storage = context.bot_storage
+
+    if chat.type != Chat.PRIVATE or storage.users.contains(chat.id):
         return
 
     logger.info("%s started a private chat with the bot", update.effective_user.full_name)
-    context.bot_data.setdefault("user_ids", set()).add(chat.id)
+    storage.users.add(chat.id)
 
 
 def extract_status_change(chat_member_update: ChatMemberUpdated) -> tuple[bool, bool] | None:
@@ -44,7 +49,7 @@ def extract_status_change(chat_member_update: ChatMemberUpdated) -> tuple[bool, 
     return was_member, is_member
 
 
-async def track_chats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def track_chats(update: Update, context: "BotContext") -> None:
     """Track joins/leaves across private chats, groups, and channels."""
     result = extract_status_change(update.my_chat_member)
     if result is None:
@@ -53,23 +58,24 @@ async def track_chats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     cause_name = update.effective_user.full_name
     chat = update.effective_chat
+    storage = context.bot_storage
     if chat.type == Chat.PRIVATE:
         if not was_member and is_member:
             logger.info("%s unblocked the bot", cause_name)
-            context.bot_data.setdefault("user_ids", set()).add(chat.id)
+            storage.users.add(chat.id)
         elif was_member and not is_member:
             logger.info("%s blocked the bot", cause_name)
-            context.bot_data.setdefault("user_ids", set()).discard(chat.id)
+            storage.users.remove(chat.id)
     elif chat.type in [Chat.GROUP, Chat.SUPERGROUP]:
         if not was_member and is_member:
             logger.info("%s added the bot to the group %s", cause_name, chat.title)
-            context.bot_data.setdefault("group_ids", set()).add(chat.id)
+            storage.groups.add(chat.id)
         elif was_member and not is_member:
             logger.info("%s removed the bot from the group %s", cause_name, chat.title)
-            context.bot_data.setdefault("group_ids", set()).discard(chat.id)
+            storage.groups.remove(chat.id)
     elif not was_member and is_member:
         logger.info("%s added the bot to the channel %s", cause_name, chat.title)
-        context.bot_data.setdefault("channel_ids", set()).add(chat.id)
+        storage.channels.add(chat.id)
     elif was_member and not is_member:
         logger.info("%s removed the bot from the channel %s", cause_name, chat.title)
-        context.bot_data.setdefault("channel_ids", set()).discard(chat.id)
+        storage.channels.remove(chat.id)

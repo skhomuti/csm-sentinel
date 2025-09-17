@@ -1,12 +1,14 @@
 from functools import wraps
-
-from telegram.ext import ContextTypes
+from typing import TYPE_CHECKING
 
 from csm_bot.handlers.state import States
 from csm_bot.handlers.utils import is_admin
 
+if TYPE_CHECKING:
+    from csm_bot.app.context import BotContext
 
-async def _notify_not_authorized(update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+async def _notify_not_authorized(update, context: "BotContext") -> None:
     query = update.callback_query
     if query is not None:
         await query.answer()
@@ -24,7 +26,7 @@ def admin_only(failure_state: States):
 
     def decorator(func):
         @wraps(func)
-        async def wrapper(update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+        async def wrapper(update, context: "BotContext", *args, **kwargs):
             user = update.effective_user
             if user is None or not is_admin(user.id, context):
                 await _notify_not_authorized(update, context)

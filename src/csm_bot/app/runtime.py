@@ -4,11 +4,11 @@ from typing import TYPE_CHECKING
 from csm_bot.config import Config
 
 if TYPE_CHECKING:
-    from telegram.ext import Application, ContextTypes
+    from telegram.ext import Application
 
+    from csm_bot.events import EventMessages
     from csm_bot.jobs import JobContext
     from csm_bot.services.subscription import TelegramSubscription
-    from csm_bot.events import EventMessages
 
 
 _RUNTIME_ATTR = "_csm_runtime"
@@ -16,7 +16,7 @@ _RUNTIME_ATTR = "_csm_runtime"
 
 @dataclass(slots=True)
 class BotRuntime:
-    """Lightweight container for the long-lived bot ontext."""
+    """Lightweight container for the long-lived bot context."""
 
     config: Config
     application: "Application"
@@ -35,7 +35,3 @@ def get_runtime_from_application(application: "Application") -> BotRuntime:
     if runtime is None:
         raise RuntimeError("Bot runtime is not attached to the application")
     return runtime
-
-
-def get_runtime_from_context(context: "ContextTypes.DEFAULT_TYPE") -> BotRuntime:
-    return get_runtime_from_application(context.application)

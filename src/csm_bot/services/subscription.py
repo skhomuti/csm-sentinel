@@ -1,16 +1,19 @@
 import logging
-from collections import defaultdict
+from typing import TYPE_CHECKING
 
 from telegram import LinkPreviewOptions
 from telegram.constants import ParseMode
-from telegram.ext import Application, ContextTypes, TypeHandler
+from telegram.ext import Application, TypeHandler
 
-from csm_bot.handlers.utils import get_actual_chat_ids
 from csm_bot.models import Block, Event
 from csm_bot.rpc import Subscription
+from csm_bot.app.storage import BotStorage
 
 logger = logging.getLogger(__name__)
 logging.getLogger("web3.providers.WebSocketProvider").setLevel(logging.WARNING)
+
+if TYPE_CHECKING:
+    from csm_bot.app.context import BotContext
 
 
 class TelegramSubscription(Subscription):
@@ -24,16 +27,23 @@ class TelegramSubscription(Subscription):
     async def process_event_log(self, event: Event):
         await self.application.update_queue.put(event)
 
-    async def handle_event_log(self, event: Event, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_event_log(self, event: Event, context: "BotContext"):
         logger.info("Handle event on the block %s: %s", event.block, event.readable())
-        actual_chat_ids = get_actual_chat_ids(context.bot_data)
+        bot_storage = context.bot_storage
+        actual_chat_ids = bot_storage.actual_chat_ids()
+        node_operator_chats = bot_storage.node_operator_chats
         if "nodeOperatorId" in event.args:
-            chats = context.bot_data["no_ids_to_chats"].get(str(event.args["nodeOperatorId"]), set())
+            chats = node_operator_chats.chats_for(str(event.args["nodeOperatorId"]))
         else:
             chats = set()
-            for node_operator_id, subscribed_chats in context.bot_data["no_ids_to_chats"].items():
-                if await self.event_messages.should_notify_node_operator(event, int(node_operator_id)):
-                    chats.update(subscribed_chats)
+            for node_operator_id in node_operator_chats.ids():
+                try:
+                    no_id_int = int(node_operator_id)
+                except ValueError:  # pragma: no cover - defensive
+                    logger.warning("Unexpected non-integer node operator id: %s", node_operator_id)
+                    continue
+                if await self.event_messages.should_notify_node_operator(event, no_id_int):
+                    chats.update(node_operator_chats.chats_for(node_operator_id))
         chats = chats.intersection(actual_chat_ids)
 
         message = await self.event_messages.get_event_message(event)
@@ -59,10 +69,9 @@ class TelegramSubscription(Subscription):
     async def process_new_block(self, block: Block):
         await self.application.update_queue.put(block)
 
-    async def handle_new_block(self, block: Block, context):
+    async def handle_new_block(self, block: Block, context: "BotContext"):
         logger.debug("Handle block: %s", block.number)
-        context.application.bot_data.setdefault("block", 0)
-        context.application.bot_data["block"] = block.number
+        context.bot_storage.block.update(block.number)
 
     def register_handlers(self) -> None:
         """Attach type handlers for block and event updates to the application."""
@@ -70,8 +79,4 @@ class TelegramSubscription(Subscription):
         self.application.add_handler(TypeHandler(Event, self.handle_event_log, block=False))
 
     def ensure_state_containers(self) -> None:
-        bot_data = self.application.bot_data
-        if "no_ids_to_chats" not in bot_data:
-            bot_data["no_ids_to_chats"] = defaultdict(set)
-        if "block" not in bot_data:
-            bot_data["block"] = 0
+        BotStorage(self.application.bot_data)

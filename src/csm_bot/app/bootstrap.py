@@ -2,14 +2,12 @@ import asyncio
 import logging
 from pathlib import Path
 
-from telegram.ext import (
-    AIORateLimiter,
-    ApplicationBuilder,
-    PicklePersistence,
-)
+from telegram.ext import AIORateLimiter, ApplicationBuilder, ContextTypes
 from web3 import AsyncWeb3, WebSocketProvider
 
+from csm_bot.app.context import BotContext
 from csm_bot.app.runtime import BotRuntime, attach_runtime
+from csm_bot.app.storage import create_persistence
 from csm_bot.config import get_config
 from csm_bot.utils import normalize_block_number
 from csm_bot.handlers.errors import error_handler, build_error_callback
@@ -26,11 +24,14 @@ def create_runtime() -> BotRuntime:
     storage_path = Path(cfg.filestorage_path)
     storage_path.mkdir(parents=True, exist_ok=True)
 
-    persistence = PicklePersistence(filepath=storage_path / "persistence.pkl")
+    persistence = create_persistence(storage_path)
+
+    context_types = ContextTypes(context=BotContext)
 
     application = (
         ApplicationBuilder()
         .token(cfg.token)
+        .context_types(context_types)
         .persistence(persistence)
         .rate_limiter(AIORateLimiter(max_retries=5))
         .build()
