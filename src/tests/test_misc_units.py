@@ -20,7 +20,7 @@ def test_event_readable_string():
 
 
 def test_main_subscription_helpers_counts():
-    from src.csm_bot.main import get_active_subscription_counts
+    from src.csm_bot.handlers.utils import get_active_subscription_counts
 
     bot_data = {
         "user_ids": {1},
@@ -45,7 +45,7 @@ def test_main_subscription_helpers_counts():
 
 
 def test_main_resolve_target_chats():
-    from src.csm_bot.main import _resolve_target_chats_for_node_operators
+    from src.csm_bot.handlers.utils import resolve_target_chats_for_node_operators
 
     bot_data = {
         "user_ids": {1},
@@ -56,7 +56,7 @@ def test_main_resolve_target_chats():
             "20": {2, 4},
         },
     }
-    targets = _resolve_target_chats_for_node_operators(bot_data, {"10", "20"})
+    targets = resolve_target_chats_for_node_operators(bot_data, {"10", "20"})
     assert targets == {1, 2}
 
 
@@ -106,4 +106,3 @@ def test_config_templates_none_when_missing_envs():
     assert cfg.etherscan_block_url_template is None
     assert cfg.etherscan_tx_url_template is None
     assert cfg.beaconchain_url_template is None
-
