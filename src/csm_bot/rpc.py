@@ -5,6 +5,7 @@ import os
 import signal
 from asyncio import BaseEventLoop
 
+import web3.exceptions
 from web3 import AsyncWeb3, WebSocketProvider
 from eth_utils import event_abi_to_log_topic, get_all_event_abis
 from web3.utils.subscriptions import (
@@ -85,6 +86,8 @@ class Subscription:
 
     @reconnect
     async def subscribe(self):
+        if self._shutdown_event.is_set():
+            return
         async for w3 in self.w3:
             vebo = w3.eth.contract(address=self.cfg.vebo_address, abi=VEBO_ABI)
             fee_distributor = w3.eth.contract(address=self.cfg.fee_distributor_address, abi=FEE_DISTRIBUTOR_ABI)
@@ -129,7 +132,7 @@ class Subscription:
                 self.cfg.fee_distributor_address,
                 self.cfg.vebo_address,
             ]:
-                logger.debug(
+                logger.info(
                     "Fetching logs for %s blocks %s-%s",
                     contract,
                     batch_start,
@@ -140,7 +143,12 @@ class Subscription:
                     toBlock=batch_end,
                     address=contract,
                 )
-                logs = await w3.eth.get_logs(filter_params)
+                try:
+                    logs = await w3.eth.get_logs(filter_params)
+                except web3.exceptions.Web3Exception as e:
+                    logger.error("Error fetching logs: %s", e)
+                    self._shutdown_event.set()
+                    break
                 for log in logs:
                     event_topic = log["topics"][0]
                     event_abi = self.abi_by_topics.get(event_topic)
@@ -158,6 +166,8 @@ class Subscription:
                         continue
                     await self.process_event_log(event)
                     await asyncio.sleep(0)
+            if self._shutdown_event.is_set():
+                break
             await self.process_new_block(Block(number=batch_end))
             logger.debug("Processed blocks up to %s", batch_end)
 

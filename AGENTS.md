@@ -11,7 +11,7 @@ These are the core guidelines for working in this repository.
 - `.env.sample.*`: Example environment files. Copy to `.env` for local runs.
 
 ## Build, Test, and Dev Commands
-- Test: `uv run pytest -q`
+- Test: `uv run pytest -q` (or `./.venv/bin/pytest -q` if `uv` cannot access its cache)
 - Run locally: `uv run python src/csm_bot/main.py` (requires `.env`).
 - Docker: `docker compose up -d` (or `docker compose -f docker-compose-ethd.yml up -d` when co‑running with eth-docker).
 
@@ -58,6 +58,7 @@ This document captures practical conventions for working with this repo using ag
 ## Typing
 - Use built‑in types for unions and generics: `str | None`, `set[int]` (Python ≥ 3.11).
 - Prefer precise types on public helpers; keep handlers small and focused.
+- Skip `from __future__ import annotations`; the runtime is already Python 3.11, so use stringified forward refs when needed.
 
 ## Adding Events/ABIs
 - Place new ABIs under `abi/` and import them in `models.py`.
