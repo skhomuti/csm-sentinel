@@ -87,6 +87,9 @@ ADMIN_BROADCAST_BY_NO = "By node operator"
 ADMIN_BROADCAST_ENTER_MESSAGE_ALL = "Please enter the message to send to all subscribers:"
 ADMIN_BROADCAST_ENTER_NO_IDS = "Please enter comma-separated node operator IDs (e.g., 1,2,3):"
 ADMIN_BROADCAST_NO_IDS_INVALID = "No valid node operator IDs provided. Please enter comma-separated IDs (e.g., 1,2,3)."
+NO_NEW_BLOCKS_ADMIN_ALERT = (
+    "⚠️ No new blocks processed in the last {minutes} minutes. Latest block: {block}"
+)
 FOLLOW_NODE_OPERATOR_TEXT = "Please enter the Node Operator id you want to follow:"
 FOLLOW_NODE_OPERATOR_FOLLOWING = "Node Operators you are following: {}" + nl()
 UNFOLLOW_NODE_OPERATOR_TEXT = "Please enter the Node Operator id you want to unfollow:"
