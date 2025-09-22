@@ -3,7 +3,11 @@
 These are the core guidelines for working in this repository.
 
 ## Project Structure & Modules
-- `src/csm_bot/`: Bot logic (Telegram handlers, event parsing, RPC subscriptions).
+- `src/csm_bot/main.py`: CLI entrypoint; asserts event mappings and hands off to the runtime bootstrapper.
+- `src/csm_bot/app/`: Runtime wiring (bootstrap, runtime container, context, persistence helpers).
+- `src/csm_bot/handlers/`: Telegram handlers grouped by domain (`admin/`, `start.py`, `tracking.py`, etc.).
+- `src/csm_bot/services/`: Long-running services such as the Web3 subscription layer.
+- `src/csm_bot/jobs.py`, `rpc.py`, `events.py`, `texts.py`, `models.py`: Scheduled jobs, RPC subscriptions, event definitions, message templates, and ABI bindings.
 - `src/tests/`: Pytest suite (unit/async tests, mocks).
 - `abi/`: Contract ABIs loaded by the app.
 - `.storage/`: Local persistence for Telegram state (mounted as a volume in Docker).
@@ -13,16 +17,16 @@ These are the core guidelines for working in this repository.
 ## Build, Test, and Dev Commands
 - Test: `uv run pytest -q` (or `./.venv/bin/pytest -q` if `uv` cannot access its cache)
 - Run locally: `uv run python src/csm_bot/main.py` (requires `.env`).
-- Docker: `docker compose up -d` (or `docker compose -f docker-compose-ethd.yml up -d` when co‑running with eth-docker).
+- Docker: `docker compose up -d` (or `docker compose -f docker-compose-ethd.yml up -d` when co-running with eth-docker).
 
 ## Coding Style & Naming
-- Python ≥ 3.11; follow PEP 8; 4‑space indentation.
+- Python ≥ 3.11; follow PEP 8; 4-space indentation.
 - Names: modules/functions `snake_case`, classes `CapWords`, constants `UPPER_SNAKE_CASE`.
-- Prefer type hints and small, focused functions. Keep side effects in entrypoints (`main.py`, `rpc.py`, `jobs.py`).
+- Prefer type hints and small, focused functions. Keep side effects in orchestrators (`main.py`, `app/bootstrap.py`, `rpc.py`, `jobs.py`).
 
 ## Testing Guidelines
 - Frameworks: `pytest`, `pytest-asyncio`.
-- Tests live in `src/tests/` and are named `test_*.py` with clear, behavior‑driven names.
+- Tests live in `src/tests/` and are named `test_*.py` with clear, behavior-driven names.
 - Mock external I/O (Web3, `aiohttp`, env) using `unittest.mock` and `@patch.dict`.
 - Run fast: avoid real network calls; rely on the prebuilt `.venv` via `uv run`.
 
@@ -42,23 +46,29 @@ These are the core guidelines for working in this repository.
 This document captures practical conventions for working with this repo using agent tooling.
 
 ## Config & Env Access
-- Prefer `get_config()` from `csm_bot.config` over ad‑hoc `os.getenv(...)`.
-- Import once and reuse a module‑level `CFG = get_config()`.
-- For tests that tweak env vars, call `get_config.cache_clear()` before re‑reading.
+- Prefer `get_config()` from `csm_bot.config` over ad-hoc `os.getenv(...)`.
+- Import once and reuse a module-level `CFG = get_config()`.
+- For tests that tweak env vars, call `get_config.cache_clear()` before re-reading.
 - When new envs are introduced, add them to `Config`, update `.env.sample.*`, and use `CFG` everywhere.
+
+## Runtime & Handlers
+- Use `app.bootstrap.create_runtime()` to wire the bot: attach new dependencies to `BotRuntime` instead of global singletons.
+- Access runtime utilities from handlers through `BotContext` (`context.runtime`, `context.bot_storage`, etc.).
+- Register new handlers in `handlers/__init__.py` so they are picked up during `register_handlers(runtime)`.
+- Prefer pure handler helpers; persist side-effects with the storage helpers in `app.storage`.
 
 ## Chain Reads & Versioning
 - Always read contract state at the event’s block: pass `block_identifier=event.block`.
-- Where pre‑state is needed, use `event.block - 1` intentionally and document it in code.
+- Where pre-state is needed, use `event.block - 1` intentionally and document it in code.
 
 ## Logging
-- No `print`; use module‑level `logger` with structured context.
+- No `print`; use module-level `logger` with structured context.
 - Warn rather than fail for recoverable issues (e.g., version probe failures, optional filters).
 
 ## Typing
-- Use built‑in types for unions and generics: `str | None`, `set[int]` (Python ≥ 3.11).
+- Use built-in types for unions and generics: `str | None`, `set[int]` (Python ≥ 3.11).
 - Prefer precise types on public helpers; keep handlers small and focused.
-- Skip `from __future__ import annotations`; the runtime is already Python 3.11, so use stringified forward refs when needed.
+- Skip `from __future__ import annotations`; the runtime is already Python 3.11, so use stringified forward refs when needed.
 
 ## Adding Events/ABIs
 - Place new ABIs under `abi/` and import them in `models.py`.
