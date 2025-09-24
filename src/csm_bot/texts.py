@@ -32,6 +32,7 @@ EVENT_DESCRIPTIONS = {
     "StuckSigningKeysCountChanged": "- 🚨 Reported stuck keys that were not exited in time",
     "VettedSigningKeysCountDecreased": "- 🚨 Uploaded invalid keys",
     "WithdrawalSubmitted": "- 👀 Key withdrawal information submitted",
+    "ValidatorExitDelayProcessed": "- 🚨 Exit delay processed; penalty queued for withdrawal",
     "TotalSigningKeysCountChanged": "- 👀 New keys uploaded or removed",
     "ValidatorExitRequest": "- 🚨 One of the validators requested to exit",
     "PublicRelease": "- 🎉 Public release of CSM!",
@@ -63,6 +64,7 @@ EVENT_LIST_TEXT = markdown(
     EVENT_DESCRIPTIONS["ELRewardsStealingPenaltyCancelled"], nl(),
     Bold("Withdrawal and Exit Requests:"), nl(1), "Notifications for exit requests and confirmation of exits.", nl(1),
     EVENT_DESCRIPTIONS["ValidatorExitRequest"], nl(1),
+    EVENT_DESCRIPTIONS["ValidatorExitDelayProcessed"], nl(1),
     EVENT_DESCRIPTIONS["WithdrawalSubmitted"], nl(),
     Bold("Common CSM Events for all the Node Operators:"), nl(1),
     EVENT_DESCRIPTIONS["DistributionLogUpdated"], nl(1),
@@ -218,6 +220,14 @@ def validator_exit_request(key, key_url, request_date, exit_until):
                     " guide for more details", nl(1),
                     "Requested key: ", TextLink(key, url=key_url), nl(1),
                     "Request date: ", Code(request_date))
+
+
+@RegisterEventMessage("ValidatorExitDelayProcessed")
+def validator_exit_delay_processed(key, key_url, penalty):
+    return markdown("🚨 ", Bold("Validator exit delay processed"), nl(),
+                    "Validator: ", TextLink(key, url=key_url), nl(1),
+                    "Delay penalty: ", Code(penalty), nl(),
+                    "Penalty will be applied when the validator exits")
 
 
 @RegisterEventMessage("PublicRelease")

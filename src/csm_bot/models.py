@@ -17,6 +17,8 @@ ACCOUNTING_V2_ABI = json.load(open("abi/CSAccountingV2.json"))
 FEE_DISTRIBUTOR_ABI = json.load(open("abi/CSFeeDistributor.json"))
 FEE_DISTRIBUTOR_V2_ABI = json.load(open("abi/CSFeeDistributorV2.json"))
 
+EXIT_PENALTIES_ABI = json.load(open("abi/CSExitPenalties.json"))
+
 PARAMETERS_REGISTRY_ABI = json.load(open("abi/CSParametersRegistry.json"))
 VEBO_ABI = json.load(open("abi/VEBO.json"))
 

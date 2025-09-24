@@ -285,6 +285,16 @@ class EventMessages:
         exit_until = request_date + datetime.timedelta(days=4)
         return template(key, key_url, _format_date(request_date), _format_date(exit_until)) + self.footer(event)
 
+    @RegisterEvent('ValidatorExitDelayProcessed')
+    async def validator_exit_delay_processed(self, event: Event):
+        if not await self.is_v2(event.block):
+            return None
+        template: callable = EVENT_MESSAGES.get(event.event)
+        key = self.w3.to_hex(event.args['pubkey'])
+        key_url = BEACONCHAIN_URL_TEMPLATE.format(key)
+        penalty = humanize_wei(event.args['delayPenalty'])
+        return template(key, key_url, penalty) + self.footer(event)
+
     @RegisterEvent('PublicRelease')
     async def public_release(self, event: Event):
         if await self.is_v2(event.block):

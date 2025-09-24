@@ -19,7 +19,16 @@ from websockets import ConnectionClosed
 from csm_bot.events import EVENTS_TO_FOLLOW
 from csm_bot.utils import normalize_block_number
 from csm_bot.config import get_config
-from csm_bot.models import Event, Block, CSM_ABI, VEBO_ABI, FEE_DISTRIBUTOR_ABI, CSM_V2_ABI, FEE_DISTRIBUTOR_V2_ABI
+from csm_bot.models import (
+    Event,
+    Block,
+    CSM_ABI,
+    VEBO_ABI,
+    FEE_DISTRIBUTOR_ABI,
+    CSM_V2_ABI,
+    FEE_DISTRIBUTOR_V2_ABI,
+    EXIT_PENALTIES_ABI,
+)
 
 logger = logging.getLogger(__name__)
 logging.getLogger("web3.providers.persistent.subscription_manager").setLevel(logging.WARNING)
@@ -38,7 +47,14 @@ class Subscription:
         super().__init__()
         self._shutdown_event = asyncio.Event()
         self._w3 = w3
-        self.abi_by_topics = topics_to_follow(CSM_ABI, CSM_V2_ABI, FEE_DISTRIBUTOR_ABI, FEE_DISTRIBUTOR_V2_ABI, VEBO_ABI)
+        self.abi_by_topics = topics_to_follow(
+            CSM_ABI,
+            CSM_V2_ABI,
+            FEE_DISTRIBUTOR_ABI,
+            FEE_DISTRIBUTOR_V2_ABI,
+            VEBO_ABI,
+            EXIT_PENALTIES_ABI,
+        )
         self.cfg = get_config()
 
     @property
@@ -91,6 +107,7 @@ class Subscription:
         async for w3 in self.w3:
             vebo = w3.eth.contract(address=self.cfg.vebo_address, abi=VEBO_ABI)
             fee_distributor = w3.eth.contract(address=self.cfg.fee_distributor_address, abi=FEE_DISTRIBUTOR_ABI)
+            exit_penalties = w3.eth.contract(address=self.cfg.exit_penalties_address, abi=EXIT_PENALTIES_ABI)
 
             subs_csm = LogsSubscription(
                 address=self.cfg.csm_address,
@@ -107,8 +124,14 @@ class Subscription:
                 topics=[fee_distributor.events.DistributionLogUpdated().topic],
                 handler=self._handle_event_log_subscription
             )
+            subs_ep = LogsSubscription(
+                address=self.cfg.exit_penalties_address,
+                topics=[exit_penalties.events.ValidatorExitDelayProcessed().topic],
+                handler=self._handle_event_log_subscription,
+            )
+
             subs_heads = NewHeadsSubscription(handler=self._handle_new_block_subscription)
-            await w3.subscription_manager.subscribe([subs_csm, subs_vebo, subs_fd, subs_heads])
+            await w3.subscription_manager.subscribe([subs_csm, subs_vebo, subs_fd, subs_ep, subs_heads])
             logger.info("Subscriptions started")
 
             await w3.subscription_manager.handle_subscriptions()
@@ -127,11 +150,14 @@ class Subscription:
         batch_size = self.cfg.block_batch_size
         for batch_start in range(start_block, current_block + 1, batch_size):
             batch_end = min(batch_start + batch_size - 1, current_block)
-            for contract in [
+            contracts = [
                 self.cfg.csm_address,
                 self.cfg.fee_distributor_address,
                 self.cfg.vebo_address,
-            ]:
+                self.cfg.exit_penalties_address,
+            ]
+
+            for contract in contracts:
                 logger.info(
                     "Fetching logs for %s blocks %s-%s",
                     contract,
