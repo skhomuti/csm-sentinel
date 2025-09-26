@@ -140,16 +140,16 @@ class Subscription:
                 break
 
 
-    async def process_blocks_from(self, start_block: int):
+    async def process_blocks_from(self, start_block: int, end_block: int | None = None):
         w3 = await anext(self.w3)
-        current_block = await w3.eth.get_block_number()
-        if start_block == current_block:
+        end_block = end_block or await w3.eth.get_block_number()
+        if start_block == end_block:
             logger.info("No blocks to process")
             return
-        logger.info("Processing blocks from %s to %s", start_block, current_block)
+        logger.info("Processing blocks from %s to %s", start_block, end_block)
         batch_size = self.cfg.block_batch_size
-        for batch_start in range(start_block, current_block + 1, batch_size):
-            batch_end = min(batch_start + batch_size - 1, current_block)
+        for batch_start in range(start_block, end_block + 1, batch_size):
+            batch_end = min(batch_start + batch_size - 1, end_block)
             contracts = [
                 self.cfg.csm_address,
                 self.cfg.fee_distributor_address,
@@ -227,10 +227,10 @@ class Subscription:
 
 class TerminalSubscription(Subscription):
     async def process_event_log(self, event: Event):
-        logger.info(f"Event %s emitted with data: %s", event.event, event.args)
+        logger.warning(f"Event %s emitted with data: %s", event.event, event.args)
 
     async def process_new_block(self, block):
-        logger.info(f"Current block number: %s", block.number)
+        logger.warning(f"Current block number: %s", block.number)
 
 
 if __name__ == '__main__':

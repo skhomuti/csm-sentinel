@@ -3,18 +3,18 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "implementation_",
+        "name": "module",
         "type": "address"
       },
       {
         "internalType": "address",
-        "name": "admin_",
+        "name": "parametersRegistry",
         "type": "address"
       },
       {
-        "internalType": "bytes",
-        "name": "data_",
-        "type": "bytes"
+        "internalType": "address",
+        "name": "strikes",
+        "type": "address"
       }
     ],
     "stateMutability": "nonpayable",
@@ -23,79 +23,72 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "target",
-        "type": "address"
-      }
-    ],
-    "name": "AddressEmptyCode",
-    "type": "error"
-  },
-  {
-    "inputs": [
+        "internalType": "uint8",
+        "name": "bits",
+        "type": "uint8"
+      },
       {
-        "internalType": "address",
-        "name": "admin",
-        "type": "address"
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
       }
     ],
-    "name": "ERC1967InvalidAdmin",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "implementation",
-        "type": "address"
-      }
-    ],
-    "name": "ERC1967InvalidImplementation",
+    "name": "SafeCastOverflowedUintDowncast",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "ERC1967NonPayable",
+    "name": "SenderIsNotModule",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "FailedInnerCall",
+    "name": "SenderIsNotStrikes",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "NotAdmin",
+    "name": "ValidatorExitDelayNotApplicable",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "ProxyIsOssified",
+    "name": "ZeroModuleAddress",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroParametersRegistryAddress",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ZeroStrikesAddress",
     "type": "error"
   },
   {
     "anonymous": false,
     "inputs": [
       {
-        "indexed": false,
-        "internalType": "address",
-        "name": "previousAdmin",
-        "type": "address"
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "nodeOperatorId",
+        "type": "uint256"
       },
       {
         "indexed": false,
-        "internalType": "address",
-        "name": "newAdmin",
-        "type": "address"
+        "internalType": "bytes",
+        "name": "pubkey",
+        "type": "bytes"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "strikesPenalty",
+        "type": "uint256"
       }
     ],
-    "name": "AdminChanged",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [],
-    "name": "ProxyOssified",
+    "name": "StrikesPenaltyProcessed",
     "type": "event"
   },
   {
@@ -103,60 +96,237 @@
     "inputs": [
       {
         "indexed": true,
-        "internalType": "address",
-        "name": "implementation",
-        "type": "address"
+        "internalType": "uint256",
+        "name": "nodeOperatorId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "exitType",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "pubkey",
+        "type": "bytes"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "withdrawalRequestPaidFee",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "withdrawalRequestRecordedFee",
+        "type": "uint256"
       }
     ],
-    "name": "Upgraded",
+    "name": "TriggeredExitFeeRecorded",
     "type": "event"
   },
   {
-    "stateMutability": "payable",
-    "type": "fallback"
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "nodeOperatorId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "pubkey",
+        "type": "bytes"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "delayPenalty",
+        "type": "uint256"
+      }
+    ],
+    "name": "ValidatorExitDelayProcessed",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "ACCOUNTING",
+    "outputs": [
+      {
+        "internalType": "contract ICSAccounting",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MODULE",
+    "outputs": [
+      {
+        "internalType": "contract ICSModule",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "PARAMETERS_REGISTRY",
+    "outputs": [
+      {
+        "internalType": "contract ICSParametersRegistry",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "STRIKES",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "STRIKES_EXIT_TYPE_ID",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "VOLUNTARY_EXIT_TYPE_ID",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "newAdmin_",
-        "type": "address"
+        "internalType": "uint256",
+        "name": "nodeOperatorId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "publicKey",
+        "type": "bytes"
       }
     ],
-    "name": "proxy__changeAdmin",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "proxy__getAdmin",
+    "name": "getExitPenaltyInfo",
     "outputs": [
       {
-        "internalType": "address",
+        "components": [
+          {
+            "components": [
+              {
+                "internalType": "uint248",
+                "name": "value",
+                "type": "uint248"
+              },
+              {
+                "internalType": "bool",
+                "name": "isValue",
+                "type": "bool"
+              }
+            ],
+            "internalType": "struct MarkedUint248",
+            "name": "delayPenalty",
+            "type": "tuple"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint248",
+                "name": "value",
+                "type": "uint248"
+              },
+              {
+                "internalType": "bool",
+                "name": "isValue",
+                "type": "bool"
+              }
+            ],
+            "internalType": "struct MarkedUint248",
+            "name": "strikesPenalty",
+            "type": "tuple"
+          },
+          {
+            "components": [
+              {
+                "internalType": "uint248",
+                "name": "value",
+                "type": "uint248"
+              },
+              {
+                "internalType": "bool",
+                "name": "isValue",
+                "type": "bool"
+              }
+            ],
+            "internalType": "struct MarkedUint248",
+            "name": "withdrawalRequestFee",
+            "type": "tuple"
+          }
+        ],
+        "internalType": "struct ExitPenaltyInfo",
         "name": "",
-        "type": "address"
+        "type": "tuple"
       }
     ],
     "stateMutability": "view",
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "proxy__getImplementation",
-    "outputs": [
+    "inputs": [
       {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
+        "internalType": "uint256",
+        "name": "nodeOperatorId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "publicKey",
+        "type": "bytes"
+      },
+      {
+        "internalType": "uint256",
+        "name": "eligibleToExitInSec",
+        "type": "uint256"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "proxy__getIsOssified",
+    "name": "isValidatorExitDelayPenaltyApplicable",
     "outputs": [
       {
         "internalType": "bool",
@@ -168,45 +338,72 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "proxy__ossify",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "newImplementation_",
-        "type": "address"
-      }
-    ],
-    "name": "proxy__upgradeTo",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "newImplementation_",
-        "type": "address"
+        "internalType": "uint256",
+        "name": "nodeOperatorId",
+        "type": "uint256"
       },
       {
         "internalType": "bytes",
-        "name": "setupCalldata_",
+        "name": "publicKey",
         "type": "bytes"
+      },
+      {
+        "internalType": "uint256",
+        "name": "eligibleToExitInSec",
+        "type": "uint256"
       }
     ],
-    "name": "proxy__upgradeToAndCall",
+    "name": "processExitDelayReport",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
-    "stateMutability": "payable",
-    "type": "receive"
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "nodeOperatorId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "publicKey",
+        "type": "bytes"
+      }
+    ],
+    "name": "processStrikesReport",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "nodeOperatorId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes",
+        "name": "publicKey",
+        "type": "bytes"
+      },
+      {
+        "internalType": "uint256",
+        "name": "withdrawalRequestPaidFee",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "exitType",
+        "type": "uint256"
+      }
+    ],
+    "name": "processTriggeredExit",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   }
 ]

@@ -246,6 +246,14 @@ def distribution_data_updated():
 @RegisterEventMessage("TargetValidatorsCountChanged")
 def target_validators_count_changed(mode_before, limit_before, mode_after, limit_after):
     match (mode_before, limit_before, mode_after, limit_after):
+        case (_, _, 1, 0):
+            return markdown("🚨 ", Bold("Target validators count changed"), nl(),
+                            "The limit has been set to zero.", nl(1),
+                            "All keys will be requested to exit first.")
+        case (_, _, 2, 0):
+            return markdown("🚨 ", Bold("Target validators count changed"), nl(),
+                            "The limit has been set to zero.", nl(1),
+                            "All keys will be requested to exit immediately.")
         case (1, _, 1, limit_after) if limit_after < limit_before:
             return markdown("🚨 ", Bold("Target validators count changed"), nl(),
                             f"The limit has been decreased from {limit_before} to {limit_after}.", nl(1),
