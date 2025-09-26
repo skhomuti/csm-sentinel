@@ -25,6 +25,7 @@ EVENT_DESCRIPTIONS = {
     "ELRewardsStealingPenaltyCancelled": "- 😮‍💨 Cancelled penalty for stealing EL rewards",
     "InitialSlashingSubmitted": "- 🚨 Initial slashing submitted for one of the validators",
     "KeyRemovalChargeApplied": "- 🔑 Applied charge for key removal",
+    "BondCurveSet": "- ℹ️ Node Operator type changed",
     "NodeOperatorManagerAddressChangeProposed": "- ℹ️ New manager address proposed",
     "NodeOperatorManagerAddressChanged": "- ✅ Manager address changed",
     "NodeOperatorRewardAddressChangeProposed": "- ℹ️ New rewards address proposed",
@@ -32,6 +33,9 @@ EVENT_DESCRIPTIONS = {
     "StuckSigningKeysCountChanged": "- 🚨 Reported stuck keys that were not exited in time",
     "VettedSigningKeysCountDecreased": "- 🚨 Uploaded invalid keys",
     "WithdrawalSubmitted": "- 👀 Key withdrawal information submitted",
+    "ValidatorExitDelayProcessed": "- 🚨 Exit delay processed; penalty queued for withdrawal",
+    "TriggeredExitFeeRecorded": "- 🚨 Triggered exit fee recorded; penalty will be charged on exit",
+    "StrikesPenaltyProcessed": "- 🚨 Strikes penalty processed; validator exited for poor performance",
     "TotalSigningKeysCountChanged": "- 👀 New keys uploaded or removed",
     "ValidatorExitRequest": "- 🚨 One of the validators requested to exit",
     "PublicRelease": "- 🎉 Public release of CSM!",
@@ -49,6 +53,7 @@ EVENT_LIST_TEXT = markdown(
     EVENT_DESCRIPTIONS["DepositedSigningKeysCountChanged"], nl(1),
     EVENT_DESCRIPTIONS["TotalSigningKeysCountChanged"], nl(1),
     EVENT_DESCRIPTIONS["KeyRemovalChargeApplied"], nl(1),
+    EVENT_DESCRIPTIONS["BondCurveSet"], nl(1),
     EVENT_DESCRIPTIONS["TargetValidatorsCountChanged"], nl(),
     Bold("Address and Reward Changes:"), nl(1), "Changes or proposals regarding management and reward addresses.",
     nl(1),
@@ -63,6 +68,9 @@ EVENT_LIST_TEXT = markdown(
     EVENT_DESCRIPTIONS["ELRewardsStealingPenaltyCancelled"], nl(),
     Bold("Withdrawal and Exit Requests:"), nl(1), "Notifications for exit requests and confirmation of exits.", nl(1),
     EVENT_DESCRIPTIONS["ValidatorExitRequest"], nl(1),
+    EVENT_DESCRIPTIONS["ValidatorExitDelayProcessed"], nl(1),
+    EVENT_DESCRIPTIONS["TriggeredExitFeeRecorded"], nl(1),
+    EVENT_DESCRIPTIONS["StrikesPenaltyProcessed"], nl(1),
     EVENT_DESCRIPTIONS["WithdrawalSubmitted"], nl(),
     Bold("Common CSM Events for all the Node Operators:"), nl(1),
     EVENT_DESCRIPTIONS["DistributionLogUpdated"], nl(1),
@@ -145,6 +153,17 @@ def key_removal_charge_applied(amount):
                     "Amount of charge: ", Code(amount))
 
 
+@RegisterEventMessage("BondCurveSet")
+def bond_curve_set(curve_id: int):
+    return markdown(
+        "ℹ️ ", Bold("Node Operator type changed"), nl(),
+        "New type id: ", Code(str(curve_id)), nl(1),
+        "Operational requirements may now differ. Check the ",
+        TextLink("CSM UI", url=CFG.csm_ui_url or ""),
+        " for updated guidance"
+    )
+
+
 @RegisterEventMessage("NodeOperatorManagerAddressChangeProposed")
 def node_operator_manager_address_change_proposed(address):
     if address == ADDRESS_ZERO:
@@ -220,6 +239,31 @@ def validator_exit_request(key, key_url, request_date, exit_until):
                     "Request date: ", Code(request_date))
 
 
+@RegisterEventMessage("ValidatorExitDelayProcessed")
+def validator_exit_delay_processed(key, key_url, penalty):
+    return markdown("🚨 ", Bold("Validator exit delay processed"), nl(),
+                    "Validator: ", TextLink(key, url=key_url), nl(1),
+                    "Delay penalty: ", Code(penalty), nl(),
+                    "Penalty will be applied when the validator exits")
+
+
+@RegisterEventMessage("TriggeredExitFeeRecorded")
+def triggered_exit_fee_recorded(key, key_url, paid_fee, recorded_fee):
+    return markdown("🚨 ", Bold("Exit fee recorded"), nl(),
+                    "Validator: ", TextLink(key, url=key_url), nl(1),
+                    "Fee paid now: ", Code(paid_fee), nl(1),
+                    "Fee to be charged on exit: ", Code(recorded_fee), nl(),
+                    "Exit fee will be applied when the validator exits")
+
+
+@RegisterEventMessage("StrikesPenaltyProcessed")
+def strikes_penalty_processed(key, key_url, penalty):
+    return markdown("🚨 ", Bold("Strikes penalty processed"), nl(),
+                    "Validator: ", TextLink(key, url=key_url), nl(1),
+                    "Penalty amount: ", Code(penalty), nl(),
+                    "Penalty will be charged when the validator withdraws")
+
+
 @RegisterEventMessage("PublicRelease")
 def public_release():
     return markdown("🎉 ", Bold("Public release of CSM is here!"), nl(),
@@ -236,6 +280,14 @@ def distribution_data_updated():
 @RegisterEventMessage("TargetValidatorsCountChanged")
 def target_validators_count_changed(mode_before, limit_before, mode_after, limit_after):
     match (mode_before, limit_before, mode_after, limit_after):
+        case (_, _, 1, 0):
+            return markdown("🚨 ", Bold("Target validators count changed"), nl(),
+                            "The limit has been set to zero.", nl(1),
+                            "All keys will be requested to exit first.")
+        case (_, _, 2, 0):
+            return markdown("🚨 ", Bold("Target validators count changed"), nl(),
+                            "The limit has been set to zero.", nl(1),
+                            "All keys will be requested to exit immediately.")
         case (1, _, 1, limit_after) if limit_after < limit_before:
             return markdown("🚨 ", Bold("Target validators count changed"), nl(),
                             f"The limit has been decreased from {limit_before} to {limit_after}.", nl(1),

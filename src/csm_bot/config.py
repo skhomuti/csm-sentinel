@@ -29,6 +29,7 @@ class Config:
     parameters_registry_address: str | None
     vebo_address: str | None
     fee_distributor_address: str | None
+    exit_penalties_address: str | None
     csm_staking_module_id: int | None
 
     # URLs
@@ -66,6 +67,7 @@ def get_config() -> Config:
         parameters_registry_address=os.getenv("PARAMETERS_REGISTRY_ADDRESS"),
         vebo_address=os.getenv("VEBO_ADDRESS"),
         fee_distributor_address=os.getenv("FEE_DISTRIBUTOR_ADDRESS"),
+        exit_penalties_address=os.getenv("EXIT_PENALTIES_ADDRESS"),
         csm_staking_module_id=(int(os.getenv("CSM_STAKING_MODULE_ID")) if os.getenv("CSM_STAKING_MODULE_ID") else None),
         etherscan_url=os.getenv("ETHERSCAN_URL"),
         beaconchain_url=os.getenv("BEACONCHAIN_URL"),

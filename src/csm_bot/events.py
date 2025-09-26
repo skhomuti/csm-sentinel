@@ -9,9 +9,6 @@ from async_lru import alru_cache
 
 from csm_bot.models import (
     Event,
-    ETHERSCAN_BLOCK_URL_TEMPLATE,
-    BEACONCHAIN_URL_TEMPLATE,
-    ETHERSCAN_TX_URL_TEMPLATE,
     ACCOUNTING_ABI,
     EventFilter,
     EventHandler,
@@ -145,12 +142,18 @@ class EventMessages:
         async with self.connectProvider:
             return await handler(self, event)
 
-    @staticmethod
-    def footer(event: Event):
-        tx_link = ETHERSCAN_TX_URL_TEMPLATE.format("0x" + event.tx.hex())
+    def footer(self, event: Event):
+        tx_template = self._require_template(self.cfg.etherscan_tx_url_template, "ETHERSCAN_URL")
+        tx_link = tx_template.format("0x" + event.tx.hex())
         if 'nodeOperatorId' not in event.args:
             return EVENT_MESSAGE_FOOTER_TX_ONLY(tx_link).as_markdown()
         return EVENT_MESSAGE_FOOTER(event.args['nodeOperatorId'], tx_link).as_markdown()
+
+    @staticmethod
+    def _require_template(template: str | None, env_var: str) -> str:
+        if template is None:
+            raise RuntimeError(f"{env_var} must be configured")
+        return template
 
     async def should_notify_node_operator(self, event: Event, node_operator_id: int) -> bool:
         """Check if a node operator should be notified for this event based on any registered filters."""
@@ -186,7 +189,8 @@ class EventMessages:
     async def el_rewards_stealing_penalty_reported(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         block_hash = self.w3.to_hex(event.args['proposedBlockHash'])
-        block_link = ETHERSCAN_BLOCK_URL_TEMPLATE.format(block_hash)
+        block_template = self._require_template(self.cfg.etherscan_block_url_template, "ETHERSCAN_URL")
+        block_link = block_template.format(block_hash)
         return template(humanize_wei(event.args['stolenAmount']), block_link) + self.footer(event)
 
     @RegisterEvent('ELRewardsStealingPenaltySettled')
@@ -210,8 +214,14 @@ class EventMessages:
             .getSigningKeys(event.args["nodeOperatorId"], event.args['keyIndex'], 1)
             .call(block_identifier=event.block)
         )
-        key_url = BEACONCHAIN_URL_TEMPLATE.format(key)
+        beacon_template = self._require_template(self.cfg.beaconchain_url_template, "BEACONCHAIN_URL")
+        key_url = beacon_template.format(key)
         return template(key, key_url) + self.footer(event)
+
+    @RegisterEvent('BondCurveSet')
+    async def bond_curve_set(self, event: Event):
+        template: callable = EVENT_MESSAGES.get(event.event)
+        return template(event.args['curveId']) + self.footer(event)
 
     @RegisterEvent('KeyRemovalChargeApplied')
     async def key_removal_charge_applied(self, event: Event):
@@ -265,7 +275,8 @@ class EventMessages:
             .getSigningKeys(event.args["nodeOperatorId"], event.args['keyIndex'], 1)
             .call(block_identifier=event.block)
         )
-        key_url = BEACONCHAIN_URL_TEMPLATE.format(key)
+        beacon_template = self._require_template(self.cfg.beaconchain_url_template, "BEACONCHAIN_URL")
+        key_url = beacon_template.format(key)
         return template(key, key_url, humanize_wei(event.args['amount'])) + self.footer(event)
 
     @RegisterEvent('TotalSigningKeysCountChanged')
@@ -280,10 +291,45 @@ class EventMessages:
     async def validator_exit_request(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
         key = self.w3.to_hex(event.args['validatorPubkey'])
-        key_url = BEACONCHAIN_URL_TEMPLATE.format(key)
+        beacon_template = self._require_template(self.cfg.beaconchain_url_template, "BEACONCHAIN_URL")
+        key_url = beacon_template.format(key)
         request_date = datetime.datetime.fromtimestamp(event.args['timestamp'], datetime.UTC)
         exit_until = request_date + datetime.timedelta(days=4)
         return template(key, key_url, _format_date(request_date), _format_date(exit_until)) + self.footer(event)
+
+    @RegisterEvent('ValidatorExitDelayProcessed')
+    async def validator_exit_delay_processed(self, event: Event):
+        if not await self.is_v2(event.block):
+            return None
+        template: callable = EVENT_MESSAGES.get(event.event)
+        key = self.w3.to_hex(event.args['pubkey'])
+        beacon_template = self._require_template(self.cfg.beaconchain_url_template, "BEACONCHAIN_URL")
+        key_url = beacon_template.format(key)
+        penalty = humanize_wei(event.args['delayPenalty'])
+        return template(key, key_url, penalty) + self.footer(event)
+
+    @RegisterEvent('TriggeredExitFeeRecorded')
+    async def triggered_exit_fee_recorded(self, event: Event):
+        if not await self.is_v2(event.block):
+            return None
+        template: callable = EVENT_MESSAGES.get(event.event)
+        key = self.w3.to_hex(event.args['pubkey'])
+        beacon_template = self._require_template(self.cfg.beaconchain_url_template, "BEACONCHAIN_URL")
+        key_url = beacon_template.format(key)
+        paid_fee = humanize_wei(event.args['withdrawalRequestPaidFee'])
+        recorded_fee = humanize_wei(event.args['withdrawalRequestRecordedFee'])
+        return template(key, key_url, paid_fee, recorded_fee) + self.footer(event)
+
+    @RegisterEvent('StrikesPenaltyProcessed')
+    async def strikes_penalty_processed(self, event: Event):
+        if not await self.is_v2(event.block):
+            return None
+        template: callable = EVENT_MESSAGES.get(event.event)
+        key = self.w3.to_hex(event.args['pubkey'])
+        beacon_template = self._require_template(self.cfg.beaconchain_url_template, "BEACONCHAIN_URL")
+        key_url = beacon_template.format(key)
+        penalty = humanize_wei(event.args['strikesPenalty'])
+        return template(key, key_url, penalty) + self.footer(event)
 
     @RegisterEvent('PublicRelease')
     async def public_release(self, event: Event):

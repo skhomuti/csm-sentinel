@@ -90,3 +90,25 @@ Admins can broadcast messages via the in-bot Admin panel:
 - Open `Admin` → `Broadcast`.
 - Choose `All subscribers` to send a message to every chat subscribed to any node operator, then enter your message.
 - Or choose `By node operator` and enter comma-separated node operator IDs (e.g., `1,2,3`), then enter your message.
+
+## Integration test suite
+
+End-to-end verification for on-chain events lives under `src/tests/integration`. Each
+scenario replays a real transaction through a lightweight harness that exposes the
+same `process_blocks_from` and `subscribe` entrypoints as the real subscription, allowing
+`EventMessages` to render the expected Markdown for every event.
+
+To enable the suite:
+
+1. Install a local fork provider:
+   - [`anvil`](https://book.getfoundry.sh/anvil/)
+2. Ensure `.env` contains a `WEB3_SOCKET_PROVIDER` that can serve archive data;
+   the tests reuse this value as the fork source (WebSocket URLs are
+   translated to their HTTP equivalents automatically)
+
+Each test spawns a dedicated local fork pinned to the case's block to keep state
+deterministic. Run the suite with:
+
+```
+uv run pytest -m integration
+```

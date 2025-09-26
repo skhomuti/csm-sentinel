@@ -19,7 +19,16 @@ from websockets import ConnectionClosed
 from csm_bot.events import EVENTS_TO_FOLLOW
 from csm_bot.utils import normalize_block_number
 from csm_bot.config import get_config
-from csm_bot.models import Event, Block, CSM_ABI, VEBO_ABI, FEE_DISTRIBUTOR_ABI, CSM_V2_ABI, FEE_DISTRIBUTOR_V2_ABI
+from csm_bot.models import (
+    Event,
+    Block,
+    CSM_ABI,
+    VEBO_ABI,
+    FEE_DISTRIBUTOR_ABI,
+    CSM_V2_ABI,
+    FEE_DISTRIBUTOR_V2_ABI,
+    EXIT_PENALTIES_ABI, ACCOUNTING_ABI, ACCOUNTING_V2_ABI,
+)
 
 logger = logging.getLogger(__name__)
 logging.getLogger("web3.providers.persistent.subscription_manager").setLevel(logging.WARNING)
@@ -38,7 +47,16 @@ class Subscription:
         super().__init__()
         self._shutdown_event = asyncio.Event()
         self._w3 = w3
-        self.abi_by_topics = topics_to_follow(CSM_ABI, CSM_V2_ABI, FEE_DISTRIBUTOR_ABI, FEE_DISTRIBUTOR_V2_ABI, VEBO_ABI)
+        self.abi_by_topics = topics_to_follow(
+            CSM_ABI,
+            CSM_V2_ABI,
+            ACCOUNTING_ABI,
+            ACCOUNTING_V2_ABI,
+            FEE_DISTRIBUTOR_ABI,
+            FEE_DISTRIBUTOR_V2_ABI,
+            VEBO_ABI,
+            EXIT_PENALTIES_ABI,
+        )
         self.cfg = get_config()
 
     @property
@@ -96,6 +114,10 @@ class Subscription:
                 address=self.cfg.csm_address,
                 handler=self._handle_event_log_subscription
             )
+            subs_acc = LogsSubscription(
+                address=self.cfg.accounting_address,
+                handler=self._handle_event_log_subscription
+            )
             subs_vebo = LogsSubscription(
                 address=self.cfg.vebo_address,
                 topics=[vebo.events.ValidatorExitRequest().topic],
@@ -107,8 +129,13 @@ class Subscription:
                 topics=[fee_distributor.events.DistributionLogUpdated().topic],
                 handler=self._handle_event_log_subscription
             )
+            subs_ep = LogsSubscription(
+                address=self.cfg.exit_penalties_address,
+                handler=self._handle_event_log_subscription,
+            )
+
             subs_heads = NewHeadsSubscription(handler=self._handle_new_block_subscription)
-            await w3.subscription_manager.subscribe([subs_csm, subs_vebo, subs_fd, subs_heads])
+            await w3.subscription_manager.subscribe([subs_csm, subs_acc, subs_vebo, subs_fd, subs_ep, subs_heads])
             logger.info("Subscriptions started")
 
             await w3.subscription_manager.handle_subscriptions()
@@ -117,21 +144,25 @@ class Subscription:
                 break
 
 
-    async def process_blocks_from(self, start_block: int):
+    async def process_blocks_from(self, start_block: int, end_block: int | None = None):
         w3 = await anext(self.w3)
-        current_block = await w3.eth.get_block_number()
-        if start_block == current_block:
+        end_block = end_block or await w3.eth.get_block_number()
+        if start_block == end_block:
             logger.info("No blocks to process")
             return
-        logger.info("Processing blocks from %s to %s", start_block, current_block)
+        logger.info("Processing blocks from %s to %s", start_block, end_block)
         batch_size = self.cfg.block_batch_size
-        for batch_start in range(start_block, current_block + 1, batch_size):
-            batch_end = min(batch_start + batch_size - 1, current_block)
-            for contract in [
+        for batch_start in range(start_block, end_block + 1, batch_size):
+            batch_end = min(batch_start + batch_size - 1, end_block)
+            contracts = [
                 self.cfg.csm_address,
+                self.cfg.accounting_address,
                 self.cfg.fee_distributor_address,
                 self.cfg.vebo_address,
-            ]:
+                self.cfg.exit_penalties_address,
+            ]
+
+            for contract in contracts:
                 logger.info(
                     "Fetching logs for %s blocks %s-%s",
                     contract,
@@ -201,10 +232,10 @@ class Subscription:
 
 class TerminalSubscription(Subscription):
     async def process_event_log(self, event: Event):
-        logger.info(f"Event %s emitted with data: %s", event.event, event.args)
+        logger.warning(f"Event %s emitted with data: %s", event.event, event.args)
 
     async def process_new_block(self, block):
-        logger.info(f"Current block number: %s", block.number)
+        logger.warning(f"Current block number: %s", block.number)
 
 
 if __name__ == '__main__':
