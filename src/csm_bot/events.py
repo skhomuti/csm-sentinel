@@ -303,6 +303,18 @@ class EventMessages:
         penalty = humanize_wei(event.args['delayPenalty'])
         return template(key, key_url, penalty) + self.footer(event)
 
+    @RegisterEvent('TriggeredExitFeeRecorded')
+    async def triggered_exit_fee_recorded(self, event: Event):
+        if not await self.is_v2(event.block):
+            return None
+        template: callable = EVENT_MESSAGES.get(event.event)
+        key = self.w3.to_hex(event.args['pubkey'])
+        beacon_template = self._require_template(self.cfg.beaconchain_url_template, "BEACONCHAIN_URL")
+        key_url = beacon_template.format(key)
+        paid_fee = humanize_wei(event.args['withdrawalRequestPaidFee'])
+        recorded_fee = humanize_wei(event.args['withdrawalRequestRecordedFee'])
+        return template(key, key_url, paid_fee, recorded_fee) + self.footer(event)
+
     @RegisterEvent('PublicRelease')
     async def public_release(self, event: Event):
         if await self.is_v2(event.block):

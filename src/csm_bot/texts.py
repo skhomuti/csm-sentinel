@@ -33,6 +33,7 @@ EVENT_DESCRIPTIONS = {
     "VettedSigningKeysCountDecreased": "- 🚨 Uploaded invalid keys",
     "WithdrawalSubmitted": "- 👀 Key withdrawal information submitted",
     "ValidatorExitDelayProcessed": "- 🚨 Exit delay processed; penalty queued for withdrawal",
+    "TriggeredExitFeeRecorded": "- 🚨 Triggered exit fee recorded; penalty queued for withdrawal",
     "TotalSigningKeysCountChanged": "- 👀 New keys uploaded or removed",
     "ValidatorExitRequest": "- 🚨 One of the validators requested to exit",
     "PublicRelease": "- 🎉 Public release of CSM!",
@@ -65,6 +66,7 @@ EVENT_LIST_TEXT = markdown(
     Bold("Withdrawal and Exit Requests:"), nl(1), "Notifications for exit requests and confirmation of exits.", nl(1),
     EVENT_DESCRIPTIONS["ValidatorExitRequest"], nl(1),
     EVENT_DESCRIPTIONS["ValidatorExitDelayProcessed"], nl(1),
+    EVENT_DESCRIPTIONS["TriggeredExitFeeRecorded"], nl(1),
     EVENT_DESCRIPTIONS["WithdrawalSubmitted"], nl(),
     Bold("Common CSM Events for all the Node Operators:"), nl(1),
     EVENT_DESCRIPTIONS["DistributionLogUpdated"], nl(1),
@@ -228,6 +230,15 @@ def validator_exit_delay_processed(key, key_url, penalty):
                     "Validator: ", TextLink(key, url=key_url), nl(1),
                     "Delay penalty: ", Code(penalty), nl(),
                     "Penalty will be applied when the validator exits")
+
+
+@RegisterEventMessage("TriggeredExitFeeRecorded")
+def triggered_exit_fee_recorded(key, key_url, paid_fee, recorded_fee):
+    return markdown("🚨 ", Bold("Exit fee recorded"), nl(),
+                    "Validator: ", TextLink(key, url=key_url), nl(1),
+                    "Fee paid now: ", Code(paid_fee), nl(1),
+                    "Fee to be charged on exit: ", Code(recorded_fee), nl(),
+                    "Exit fee will be applied when the validator exits")
 
 
 @RegisterEventMessage("PublicRelease")

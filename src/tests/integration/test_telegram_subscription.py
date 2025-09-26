@@ -307,6 +307,12 @@ async def test_process_blocks_distribution_log_updated(anvil_launcher, via_subsc
     )
 
 
+@pytest.mark.skip(reason="Awaiting TriggeredExitFeeRecorded replay data")
+async def test_process_blocks_triggered_exit_fee_recorded(anvil_launcher, via_subscription):
+    """Placeholder for TriggeredExitFeeRecorded integration coverage."""
+    pass
+
+
 async def test_process_blocks_target_validators_count_changed(anvil_launcher, via_subscription):
     await _exercise_event(
         event_name="TargetValidatorsCountChanged",

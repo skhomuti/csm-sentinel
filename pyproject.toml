@@ -19,6 +19,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.uv]
+cache-dir = ".uv-cache"
 dev-dependencies = [
     "pytest>=8.3.4",
     "pytest-xdist>=3.8.0",
