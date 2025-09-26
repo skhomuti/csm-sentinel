@@ -27,7 +27,7 @@ from csm_bot.models import (
     FEE_DISTRIBUTOR_ABI,
     CSM_V2_ABI,
     FEE_DISTRIBUTOR_V2_ABI,
-    EXIT_PENALTIES_ABI,
+    EXIT_PENALTIES_ABI, ACCOUNTING_ABI, ACCOUNTING_V2_ABI,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,6 +50,8 @@ class Subscription:
         self.abi_by_topics = topics_to_follow(
             CSM_ABI,
             CSM_V2_ABI,
+            ACCOUNTING_ABI,
+            ACCOUNTING_V2_ABI,
             FEE_DISTRIBUTOR_ABI,
             FEE_DISTRIBUTOR_V2_ABI,
             VEBO_ABI,
@@ -107,10 +109,13 @@ class Subscription:
         async for w3 in self.w3:
             vebo = w3.eth.contract(address=self.cfg.vebo_address, abi=VEBO_ABI)
             fee_distributor = w3.eth.contract(address=self.cfg.fee_distributor_address, abi=FEE_DISTRIBUTOR_ABI)
-            exit_penalties = w3.eth.contract(address=self.cfg.exit_penalties_address, abi=EXIT_PENALTIES_ABI)
 
             subs_csm = LogsSubscription(
                 address=self.cfg.csm_address,
+                handler=self._handle_event_log_subscription
+            )
+            subs_acc = LogsSubscription(
+                address=self.cfg.accounting_address,
                 handler=self._handle_event_log_subscription
             )
             subs_vebo = LogsSubscription(
@@ -126,12 +131,11 @@ class Subscription:
             )
             subs_ep = LogsSubscription(
                 address=self.cfg.exit_penalties_address,
-                topics=[exit_penalties.events.ValidatorExitDelayProcessed().topic],
                 handler=self._handle_event_log_subscription,
             )
 
             subs_heads = NewHeadsSubscription(handler=self._handle_new_block_subscription)
-            await w3.subscription_manager.subscribe([subs_csm, subs_vebo, subs_fd, subs_ep, subs_heads])
+            await w3.subscription_manager.subscribe([subs_csm, subs_acc, subs_vebo, subs_fd, subs_ep, subs_heads])
             logger.info("Subscriptions started")
 
             await w3.subscription_manager.handle_subscriptions()
@@ -152,6 +156,7 @@ class Subscription:
             batch_end = min(batch_start + batch_size - 1, end_block)
             contracts = [
                 self.cfg.csm_address,
+                self.cfg.accounting_address,
                 self.cfg.fee_distributor_address,
                 self.cfg.vebo_address,
                 self.cfg.exit_penalties_address,

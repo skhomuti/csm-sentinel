@@ -218,6 +218,11 @@ class EventMessages:
         key_url = beacon_template.format(key)
         return template(key, key_url) + self.footer(event)
 
+    @RegisterEvent('BondCurveSet')
+    async def bond_curve_set(self, event: Event):
+        template: callable = EVENT_MESSAGES.get(event.event)
+        return template(event.args['curveId']) + self.footer(event)
+
     @RegisterEvent('KeyRemovalChargeApplied')
     async def key_removal_charge_applied(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
@@ -314,6 +319,17 @@ class EventMessages:
         paid_fee = humanize_wei(event.args['withdrawalRequestPaidFee'])
         recorded_fee = humanize_wei(event.args['withdrawalRequestRecordedFee'])
         return template(key, key_url, paid_fee, recorded_fee) + self.footer(event)
+
+    @RegisterEvent('StrikesPenaltyProcessed')
+    async def strikes_penalty_processed(self, event: Event):
+        if not await self.is_v2(event.block):
+            return None
+        template: callable = EVENT_MESSAGES.get(event.event)
+        key = self.w3.to_hex(event.args['pubkey'])
+        beacon_template = self._require_template(self.cfg.beaconchain_url_template, "BEACONCHAIN_URL")
+        key_url = beacon_template.format(key)
+        penalty = humanize_wei(event.args['strikesPenalty'])
+        return template(key, key_url, penalty) + self.footer(event)
 
     @RegisterEvent('PublicRelease')
     async def public_release(self, event: Event):

@@ -307,10 +307,59 @@ async def test_process_blocks_distribution_log_updated(anvil_launcher, via_subsc
     )
 
 
-@pytest.mark.skip(reason="Awaiting TriggeredExitFeeRecorded replay data")
 async def test_process_blocks_triggered_exit_fee_recorded(anvil_launcher, via_subscription):
-    """Placeholder for TriggeredExitFeeRecorded integration coverage."""
-    pass
+    await _exercise_event(
+        event_name="TriggeredExitFeeRecorded",
+        fork_block=1292072,
+        tx_hash="0xaf7969ea79766f13956215cd2abca8395d006d1d54493773adf28975cb6f6b1d",
+        expected_markdown=(
+            "🚨 *Exit fee recorded*\n\n"
+            "Validator: [0xaaaf86690452a63abe9ef3398055c7105fd78ea980eddfd5513612e1ef7342b49190fef0de38188bc850a7c474bce8e0]"
+            "(https://beaconcha.in/validator/0xaaaf86690452a63abe9ef3398055c7105fd78ea980eddfd5513612e1ef7342b49190fef0de38188bc850a7c474bce8e0)\n"
+            "Fee paid now: `1 wei`\n"
+            "Fee to be charged on exit: `1 wei`\n\n"
+            "Exit fee will be applied when the validator exits\n\n"
+            "nodeOperatorId: 120\n"
+            "[Transaction](https://etherscan.io/tx/0xdeadbeef)"
+        ),
+        anvil_launcher=anvil_launcher,
+        via_subscription=via_subscription,
+    )
+
+
+async def test_process_blocks_strikes_penalty_processed(anvil_launcher, via_subscription):
+    await _exercise_event(
+        event_name="StrikesPenaltyProcessed",
+        fork_block=1292072,
+        tx_hash="0xaf7969ea79766f13956215cd2abca8395d006d1d54493773adf28975cb6f6b1d",
+        expected_markdown=(
+            "🚨 *Strikes penalty processed*\n\n"
+            "Validator: [0xaaaf86690452a63abe9ef3398055c7105fd78ea980eddfd5513612e1ef7342b49190fef0de38188bc850a7c474bce8e0]"
+            "(https://beaconcha.in/validator/0xaaaf86690452a63abe9ef3398055c7105fd78ea980eddfd5513612e1ef7342b49190fef0de38188bc850a7c474bce8e0)\n"
+            "Penalty amount: `0\\.258 ether`\n\n"
+            "Penalty will be charged when the validator withdraws\n\n"
+            "nodeOperatorId: 120\n"
+            "[Transaction](https://etherscan.io/tx/0xdeadbeef)"
+        ),
+        anvil_launcher=anvil_launcher,
+        via_subscription=via_subscription,
+    )
+
+
+async def test_bond_curve_set(anvil_launcher, via_subscription):
+    await _exercise_event(
+        event_name="BondCurveSet",
+        fork_block=1103471,
+        tx_hash="0x4b6a752d52ff1e480ba51d0038f16b8a5e9c27bc0f3fd99aa09dff5401e97282",
+        expected_markdown=(
+            'ℹ️ *Node Operator type changed*\n\nNew type id: `2`\n'
+            'Operational requirements may now differ\\. '
+            'Check the [CSM UI](https://csm.lido.fi) for updated guidance\n\n'
+            'nodeOperatorId: 234\n[Transaction](https://etherscan.io/tx/0xdeadbeef)'
+        ),
+        anvil_launcher=anvil_launcher,
+        via_subscription=via_subscription,
+    )
 
 
 async def test_process_blocks_target_validators_count_changed(anvil_launcher, via_subscription):

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from src.csm_bot.texts import target_validators_count_changed
 from hexbytes import HexBytes
 
