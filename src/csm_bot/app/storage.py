@@ -1,7 +1,5 @@
 """Storage helpers wrapping the persistence-backed bot and chat state."""
 
-from __future__ import annotations
-
 import logging
 from collections.abc import Iterable, MutableMapping
 from pathlib import Path

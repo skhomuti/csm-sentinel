@@ -1,6 +1,8 @@
 import asyncio
 import datetime
 import logging
+from collections.abc import Iterable
+from dataclasses import dataclass, field
 
 import aiohttp
 from eth_utils import humanize_wei
@@ -10,20 +12,49 @@ from async_lru import alru_cache
 from csm_bot.models import (
     Event,
     ACCOUNTING_ABI,
-    EventFilter,
     EventHandler,
     CSM_ABI,
     ACCOUNTING_V2_ABI,
     CSM_V2_ABI,
     PARAMETERS_REGISTRY_ABI,
 )
-from csm_bot.texts import EVENT_MESSAGES, EVENT_MESSAGE_FOOTER, EVENT_MESSAGE_FOOTER_TX_ONLY, EVENT_EMITS
+from csm_bot.texts import (
+    EVENT_MESSAGES,
+    EVENT_MESSAGE_FOOTER,
+    EVENT_MESSAGE_FOOTER_TX_ONLY,
+    EVENT_EMITS,
+)
 from csm_bot.config import get_config
 
 # This is a dictionary that will be populated with the events to follow
 EVENTS_TO_FOLLOW: dict[str, EventHandler] = {}
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class NotificationPlan:
+    """Container describing how subscribers should be notified for an event."""
+
+    # Optional general broadcast message
+    broadcast: str | None = None
+    # If set, restrict broadcast to these node operator IDs (as strings)
+    broadcast_node_operator_ids: set[str] | None = None
+    # Specific messages for individual node operators (keyed by node operator ID as string)
+    per_node_operator: dict[str, str] = field(default_factory=dict)
+
+    def add_node_operator_message(self, node_operator_id: int | str, message: str) -> None:
+        """Register a node-operator specific message, storing the ID as a string."""
+
+        self.per_node_operator[str(node_operator_id)] = message
+
+    def with_broadcast_targets(
+        self, node_operator_ids: Iterable[int | str]
+    ) -> "NotificationPlan":
+        """Limit broadcast delivery to the provided node operator identifiers."""
+
+        self.broadcast_node_operator_ids = {str(no_id) for no_id in node_operator_ids}
+        return self
 
 class ConnectOnDemand:
     connected_clients = 0
@@ -50,43 +81,12 @@ def _format_date(date: datetime.datetime):
     return date.strftime("%a %d %b %Y, %I:%M%p UTC")
 
 
-class IPFSDistributionFilter(EventFilter):
-    """Filter that checks if node operator exists in IPFS distribution data."""
-    
-    async def should_notify(self, event, node_operator_id: int, event_messages) -> bool:
-        """Check if node operator ID exists in the IPFS distribution data."""
-        try:
-            distribution_log = await self._fetch_distribution_log(event.args.get("logCid"))
-        except Exception as e:
-            logger.warning("Failed to fetch IPFS distribution data for event %s: %s",
-                         event.event, e)
-            return False
-        
-        # Check if node operator ID exists in the operators list
-        operators = distribution_log.get("operators", {})
-        return str(node_operator_id) in operators
-
-    @alru_cache(maxsize=3)
-    async def _fetch_distribution_log(self, log_cid: str):
-        """Fetch distribution data from IPFS using logCid."""
-        ipfs_url = f"https://ipfs.io/ipfs/{log_cid}"
-        
-        # Use timeout to prevent hanging requests
-        timeout = aiohttp.ClientTimeout(total=30)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(ipfs_url) as response:
-                if response.status != 200:
-                    raise aiohttp.ClientError(f"HTTP {response.status} when fetching {ipfs_url}")
-                return await response.json()
-    
-
 class RegisterEvent:
-    def __init__(self, event_name, event_filter: EventFilter = None):
+    def __init__(self, event_name):
         self.event_name = event_name
-        self.event_filter = event_filter
 
     def __call__(self, func):
-        EVENTS_TO_FOLLOW[self.event_name] = EventHandler(self.event_name, func, self.event_filter)
+        EVENTS_TO_FOLLOW[self.event_name] = EventHandler(self.event_name, func)
         return func
 
 
@@ -130,17 +130,53 @@ class EventMessages:
     async def get_accounting(self, block: int):
         return self.accounting_v2 if await self.is_v2(block) else self.accounting
 
-    async def default(self, event: Event):
-        return EVENT_EMITS.format(event.event, event.args)
+    @alru_cache(maxsize=3)
+    async def _fetch_distribution_log(self, log_cid: str):
+        """Retrieve a distribution log from IPFS using the provided CID."""
 
-    async def get_event_message(self, event: Event):
+        if not log_cid:
+            raise ValueError("log_cid must be provided")
+
+        ipfs_url = f"https://ipfs.io/ipfs/{log_cid}"
+        timeout = aiohttp.ClientTimeout(total=30)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(ipfs_url) as response:
+                if response.status != 200:
+                    raise aiohttp.ClientError(f"HTTP {response.status} when fetching {ipfs_url}")
+                return await response.json()
+
+    @staticmethod
+    def _validator_sort_key(validator_id: str) -> tuple[int, int | str]:
+        validator_str = str(validator_id)
+        if validator_str.isdigit():
+            return 0, int(validator_str)
+        return 1, validator_str
+
+    async def default(self, event: Event):
+        return NotificationPlan(broadcast=EVENT_EMITS.format(event.event, event.args))
+
+    async def get_notification_plan(self, event: Event):
         event_handler = EVENTS_TO_FOLLOW.get(event.event)
         if event_handler is not None:
             handler = event_handler.handler
         else:
             handler = self.default
         async with self.connectProvider:
-            return await handler(self, event)
+            result: NotificationPlan | str = await handler(self, event)
+
+        if result is None:
+            return None
+
+        plan = result if isinstance(result, NotificationPlan) else NotificationPlan(broadcast=result)
+
+        if (
+            plan.broadcast
+            and plan.broadcast_node_operator_ids is None
+            and "nodeOperatorId" in event.args
+        ):
+            plan.with_broadcast_targets({event.args["nodeOperatorId"]})
+
+        return plan
 
     def footer(self, event: Event):
         tx_template = self._require_template(self.cfg.etherscan_tx_url_template, "ETHERSCAN_URL")
@@ -154,21 +190,6 @@ class EventMessages:
         if template is None:
             raise RuntimeError(f"{env_var} must be configured")
         return template
-
-    async def should_notify_node_operator(self, event: Event, node_operator_id: int) -> bool:
-        """Check if a node operator should be notified for this event based on any registered filters."""
-        event_filter: EventFilter = EVENTS_TO_FOLLOW.get(event.event).filter
-        if event_filter:
-            try:
-                async with self.connectProvider:
-                    return await event_filter.should_notify(event, node_operator_id, self)
-            except Exception as e:
-                logger.warning("Failed to apply filter for event %s and node operator %s: %s",
-                             event.event, node_operator_id, e)
-                # If we can't determine, don't send notification to be safe
-                return False
-        # No filter registered, allow notification
-        return True
 
     @RegisterEvent('DepositedSigningKeysCountChanged')
     async def deposited_signing_keys_count_changed(self, event: Event):
@@ -338,11 +359,60 @@ class EventMessages:
         template: callable = EVENT_MESSAGES.get(event.event)
         return template() + self.footer(event)
 
-    @RegisterEvent("DistributionLogUpdated", IPFSDistributionFilter())
-    async def distribution_data_updated(self, event: Event):
-        # TODO add StrikesDataUpdated
+    @RegisterEvent("DistributionLogUpdated")
+    async def distribution_log_updated(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
-        return template() + self.footer(event)
+        base_message = template()
+        footer = self.footer(event)
+
+        plan = NotificationPlan(broadcast=f"{base_message}{footer}")
+
+        log_cid = event.args.get("logCid")
+        try:
+            distribution_log = await self._fetch_distribution_log(log_cid)
+        except Exception as exc:
+            logger.warning(
+                "Failed to enrich DistributionLogUpdated for logCid %s: %s",
+                log_cid,
+                exc,
+            )
+            return plan
+
+        entries = distribution_log if isinstance(distribution_log, list) else [distribution_log]
+
+        all_operator_ids: set[str] = set()
+        strikes_per_operator: dict = {}
+
+        for entry in entries:
+            operators = entry.get("operators", {}) or {}
+            for operator_id, operator_data in operators.items():
+                operator_id_str = str(operator_id)
+                all_operator_ids.add(operator_id_str)
+
+                validators = operator_data.get("validators", {}) or {}
+                for validator_id, validator_data in validators.items():
+                    strikes = int(validator_data.get("strikes", 0))
+
+                    if strikes <= 0:
+                        continue
+                    strikes_per_operator.setdefault(operator_id_str, []).append(
+                        (
+                            str(validator_id),
+                            strikes
+                        )
+                    )
+
+        if all_operator_ids:
+            plan.with_broadcast_targets(all_operator_ids)
+
+        for operator_id, flagged in strikes_per_operator.items():
+            flagged_sorted = sorted(flagged, key=lambda item: self._validator_sort_key(item[0]))
+            plan.add_node_operator_message(
+                operator_id,
+                f"{template(operator_id, flagged_sorted)}{footer}"
+            )
+
+        return plan
 
     @RegisterEvent("TargetValidatorsCountChanged")
     async def target_validators_count_changed(self, event: Event):
