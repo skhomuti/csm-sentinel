@@ -271,10 +271,25 @@ def public_release():
 
 
 @RegisterEventMessage("DistributionLogUpdated")
-def distribution_data_updated():
-    return markdown("📈 ", Bold("Rewards distributed!"), nl(),
-                    "Follow the ", TextLink("CSM UI", url=CFG.csm_ui_url or ""),
-                    " to check new claimable rewards.")
+def distribution_data_updated(node_operator_id: int | None=None, striked_validators: list | None=None):
+    base_message = Text(
+        "📈 ", Bold("Rewards distributed!"), nl(),
+        "Follow the ", TextLink("CSM UI", url=CFG.csm_ui_url or ""),
+        " to check new claimable rewards."
+    )
+
+    if node_operator_id is not None and striked_validators:
+
+        return Text(
+            base_message,
+            Text(nl(),
+                "⚠️ ", Bold("Strikes detected for your validators"), nl(),
+                "Node Operator ID: ", Code(str(node_operator_id)), nl(1),
+                "Validators with strikes: ", Code(len(striked_validators)), nl(1),
+            )
+        ).as_markdown()
+
+    return base_message.as_markdown()
 
 
 @RegisterEventMessage("TargetValidatorsCountChanged")

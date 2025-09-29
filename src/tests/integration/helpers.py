@@ -88,8 +88,6 @@ async def build_subscription(ws_url: str) -> "EventReplayHarness":
 class EventReplayHarness(Subscription):
     """Minimal replay helper mirroring subscription entrypoints."""
 
-    message: str = None
-
     def __init__(self, persistent_w3: AsyncWeb3, w3: AsyncWeb3) -> None:
         super().__init__(persistent_w3)
         self.event_messages = EventMessages(w3)
@@ -97,7 +95,7 @@ class EventReplayHarness(Subscription):
 
     async def process_event_log(self, event: Event):
         event.tx = HexBytes("0xdeadbeef")
-        self.processed_events.append((event, await self.event_messages.get_event_message(event)))
+        self.processed_events.append((event, await self.event_messages.get_notification_plan(event)))
 
     async def process_new_block(self, block: Block):
         pass

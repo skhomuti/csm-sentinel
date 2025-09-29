@@ -62,7 +62,7 @@ async def _exercise_event(
                     )
                 ), (f"Did not find expected message for event {event_name}, \n"
                     f"{expected_markdown=}\n"
-                    f"found={[msg for event, msg in harness.processed_events]}")
+                    f"found={[plan.broadcast if plan else None for event, plan in harness.processed_events]}")
             finally:
                 harness._shutdown_event.set()
         else:
@@ -70,7 +70,7 @@ async def _exercise_event(
             assert _has_expected_message(harness, event_name=event_name, expected_markdown=expected_markdown), \
                 (f"Did not find expected message for event {event_name}, \n"
                  f"{expected_markdown=}\n"
-                 f"found={[msg for event, msg in harness.processed_events]}")
+                 f"found={[plan.broadcast if plan else None for event, plan in harness.processed_events]}")
 
     finally:
         await harness.disconnect()
@@ -94,9 +94,9 @@ def _has_expected_message(
     expected_markdown: str | None
 ) -> bool:
     messages = []
-    for event, message in harness.processed_events:
+    for event, plan in harness.processed_events:
         if event is not None and event.event == event_name:
-            messages.append(message)
+            messages.append(plan.broadcast if plan else None)
     if not messages:
         return False
     if expected_markdown is None:

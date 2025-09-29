@@ -32,37 +32,59 @@ class TelegramSubscription(Subscription):
         bot_storage = context.bot_storage
         actual_chat_ids = bot_storage.actual_chat_ids()
         node_operator_chats = bot_storage.node_operator_chats
-        if "nodeOperatorId" in event.args:
-            chats = node_operator_chats.chats_for(str(event.args["nodeOperatorId"]))
-        else:
-            chats = set()
-            for node_operator_id in node_operator_chats.ids():
-                try:
-                    no_id_int = int(node_operator_id)
-                except ValueError:  # pragma: no cover - defensive
-                    logger.warning("Unexpected non-integer node operator id: %s", node_operator_id)
-                    continue
-                if await self.event_messages.should_notify_node_operator(event, no_id_int):
-                    chats.update(node_operator_chats.chats_for(node_operator_id))
-        chats = chats.intersection(actual_chat_ids)
-
-        message = await self.event_messages.get_event_message(event)
-        if message is None:
-            logger.warning("No message found for event %s", event.readable())
+        plan = await self.event_messages.get_notification_plan(event)
+        if plan is None:
             return
 
         sent_messages = 0
-        for chat in chats:
-            try:
-                await context.bot.send_message(
-                    chat_id=chat,
-                    text=message,
-                    parse_mode=ParseMode.MARKDOWN_V2,
-                    link_preview_options=LinkPreviewOptions(is_disabled=True),
-                )
-                sent_messages += 1
-            except Exception as exc:  # pragma: no cover - depends on Telegram runtime
-                logger.error("Error sending message to chat %s: %s", chat, exc)
+        targeted_chats: set[int] = set()
+
+        for node_operator_id, message in plan.per_node_operator.items():
+            chats = node_operator_chats.chats_for(node_operator_id)
+            chats = chats.intersection(actual_chat_ids)
+            if not chats:
+                continue
+            for chat in chats:
+                try:
+                    await context.bot.send_message(
+                        chat_id=chat,
+                        text=message,
+                        parse_mode=ParseMode.MARKDOWN_V2,
+                        link_preview_options=LinkPreviewOptions(is_disabled=True),
+                    )
+                    targeted_chats.add(chat)
+                    sent_messages += 1
+                except Exception as exc:  # pragma: no cover - depends on Telegram runtime
+                    logger.error("Error sending message to chat %s: %s", chat, exc)
+
+        if plan.broadcast:
+            targeted_ids = set(plan.per_node_operator.keys())
+            if plan.broadcast_node_operator_ids is not None:
+                candidate_ids = plan.broadcast_node_operator_ids
+            else:
+                candidate_ids = node_operator_chats.ids()
+
+            candidate_ids -= targeted_ids
+
+            broadcast_chats: set[int] = set()
+            for node_operator_id in candidate_ids:
+                broadcast_chats.update(node_operator_chats.chats_for(node_operator_id))
+
+            broadcast_chats = broadcast_chats.intersection(actual_chat_ids)
+            broadcast_chats -= targeted_chats
+
+            for chat in broadcast_chats:
+                try:
+                    await context.bot.send_message(
+                        chat_id=chat,
+                        text=plan.broadcast,
+                        parse_mode=ParseMode.MARKDOWN_V2,
+                        link_preview_options=LinkPreviewOptions(is_disabled=True),
+                    )
+                    sent_messages += 1
+                except Exception as exc:  # pragma: no cover - depends on Telegram runtime
+                    logger.error("Error sending message to chat %s: %s", chat, exc)
+
         if sent_messages:
             logger.info("Messages sent: %s", sent_messages)
 
