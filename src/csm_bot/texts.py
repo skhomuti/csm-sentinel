@@ -1,4 +1,4 @@
-from aiogram.utils.formatting import Text, Bold, TextLink, Code
+from aiogram.utils.formatting import Text, Bold, TextLink, Code, Italic
 from web3.constants import ADDRESS_ZERO
 from csm_bot.config import get_config
 
@@ -41,7 +41,7 @@ EVENT_DESCRIPTIONS = {
     "PublicRelease": "- 🎉 Public release of CSM!",
     "DistributionLogUpdated": "- 📈 New rewards distributed",
     "TargetValidatorsCountChanged": "- 🚨 Target validators count changed",
-    "Initialized": "- ✅ CSM v2 is here!",
+    "Initialized": "- 🎉 CSM v2 launched on mainnet",
 }
 
 EVENT_LIST_TEXT = markdown(
@@ -330,4 +330,14 @@ def target_validators_count_changed(mode_before, limit_before, mode_after, limit
 
 @RegisterEventMessage("Initialized")
 def initialized():
-    return markdown("✅ ", Bold("🎉 CSM v2 is here!"))
+    return markdown(
+        "🎉 ", Bold("CSM v2 is live!"), nl(),
+        "No software update or migration is required. Explore the ", TextLink("CSM widget", url="https://csm.lido.fi"),
+        " to try out new features. More info ", TextLink("here.", url="https://discord.com/channels/761182643269795850/1293241757382738001/1399751236579758140"), nl(),
+        Bold("For those who are in the "),
+        TextLink("initial ICS list", url="https://ipfs.io/ipfs/bafkreido7ieacbe6nlhdivxfp2gd5kxovofngf6qdmahih4laihm675e2a"),
+        Bold(" or applied for ICS, please read "),
+        TextLink("this short note", url="https://hackmd.io/@lido/csm-v2-checklist"),
+        Bold(" to learn more."), nl(),
+        Italic("Thank you all for being with us from v1 to v2. CSM is committed to bringing more home stakers into Ethereum. We’d greatly appreciate your help in amplifying this update!")
+    )
