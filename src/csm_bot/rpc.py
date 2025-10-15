@@ -25,9 +25,8 @@ from csm_bot.models import (
     CSM_ABI,
     VEBO_ABI,
     FEE_DISTRIBUTOR_ABI,
-    CSM_V2_ABI,
-    FEE_DISTRIBUTOR_V2_ABI,
-    EXIT_PENALTIES_ABI, ACCOUNTING_ABI, ACCOUNTING_V2_ABI,
+    EXIT_PENALTIES_ABI,
+    ACCOUNTING_ABI,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,11 +48,8 @@ class Subscription:
         self._w3 = w3
         self.abi_by_topics = topics_to_follow(
             CSM_ABI,
-            CSM_V2_ABI,
             ACCOUNTING_ABI,
-            ACCOUNTING_V2_ABI,
             FEE_DISTRIBUTOR_ABI,
-            FEE_DISTRIBUTOR_V2_ABI,
             VEBO_ABI,
             EXIT_PENALTIES_ABI,
         )

@@ -17,12 +17,7 @@ async def anvil_launcher(unused_tcp_port_factory) -> Callable[[int], Awaitable[A
 
     async def _launch(fork_block: int) -> AnvilInstance:
         port = unused_tcp_port_factory()
-        try:
-            instance = await start_anvil(fork_block, port, fork_url)
-        except RuntimeError as exc:
-            pytest.skip(str(exc))
-        except FileNotFoundError as exc:
-            pytest.skip(str(exc))
+        instance = await start_anvil(fork_block, port, fork_url)
         instances.append(instance)
         return instance
 

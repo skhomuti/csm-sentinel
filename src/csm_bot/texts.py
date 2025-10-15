@@ -23,14 +23,12 @@ EVENT_DESCRIPTIONS = {
     "ELRewardsStealingPenaltyReported": "- 🚨 Penalty for stealing EL rewards reported",
     "ELRewardsStealingPenaltySettled": "- 🚨 EL rewards stealing penalty confirmed and applied",
     "ELRewardsStealingPenaltyCancelled": "- 😮‍💨 Cancelled penalty for stealing EL rewards",
-    "InitialSlashingSubmitted": "- 🚨 Initial slashing submitted for one of the validators",
     "KeyRemovalChargeApplied": "- 🔑 Applied charge for key removal",
     "BondCurveSet": "- ℹ️ Node Operator type changed",
     "NodeOperatorManagerAddressChangeProposed": "- ℹ️ New manager address proposed",
     "NodeOperatorManagerAddressChanged": "- ✅ Manager address changed",
     "NodeOperatorRewardAddressChangeProposed": "- ℹ️ New rewards address proposed",
     "NodeOperatorRewardAddressChanged": "- ✅ Rewards address changed",
-    "StuckSigningKeysCountChanged": "- 🚨 Reported stuck keys that were not exited in time",
     "VettedSigningKeysCountDecreased": "- 🚨 Uploaded invalid keys",
     "WithdrawalSubmitted": "- 👀 Key withdrawal information submitted",
     "ValidatorExitDelayProcessed": "- 🚨 Exit delay processed; penalty queued for withdrawal",
@@ -38,7 +36,6 @@ EVENT_DESCRIPTIONS = {
     "StrikesPenaltyProcessed": "- 🚨 Strikes penalty processed; validator exited for poor performance",
     "TotalSigningKeysCountChanged": "- 👀 New keys uploaded or removed",
     "ValidatorExitRequest": "- 🚨 One of the validators requested to exit",
-    "PublicRelease": "- 🎉 Public release of CSM!",
     "DistributionLogUpdated": "- 📈 New rewards distributed",
     "TargetValidatorsCountChanged": "- 🚨 Target validators count changed",
     "Initialized": "- 🎉 CSM v2 launched on mainnet",
@@ -49,7 +46,6 @@ EVENT_LIST_TEXT = markdown(
     "A 🚨 means urgent action is required from you", nl(),
     Bold("Key Management Events:"), nl(1), "Changes related to keys and their status.", nl(1),
     EVENT_DESCRIPTIONS["VettedSigningKeysCountDecreased"], nl(1),
-    EVENT_DESCRIPTIONS["StuckSigningKeysCountChanged"], nl(1),
     EVENT_DESCRIPTIONS["DepositedSigningKeysCountChanged"], nl(1),
     EVENT_DESCRIPTIONS["TotalSigningKeysCountChanged"], nl(1),
     EVENT_DESCRIPTIONS["KeyRemovalChargeApplied"], nl(1),
@@ -62,7 +58,6 @@ EVENT_LIST_TEXT = markdown(
     EVENT_DESCRIPTIONS["NodeOperatorRewardAddressChangeProposed"], nl(1),
     EVENT_DESCRIPTIONS["NodeOperatorRewardAddressChanged"], nl(),
     Bold("Slashing and Stealing Events:"), nl(1), "Alerts for validator status and MEV stealing penalties.", nl(1),
-    EVENT_DESCRIPTIONS["InitialSlashingSubmitted"], nl(1),
     EVENT_DESCRIPTIONS["ELRewardsStealingPenaltyReported"], nl(1),
     EVENT_DESCRIPTIONS["ELRewardsStealingPenaltySettled"], nl(1),
     EVENT_DESCRIPTIONS["ELRewardsStealingPenaltyCancelled"], nl(),
@@ -74,7 +69,6 @@ EVENT_LIST_TEXT = markdown(
     EVENT_DESCRIPTIONS["WithdrawalSubmitted"], nl(),
     Bold("Common CSM Events for all the Node Operators:"), nl(1),
     EVENT_DESCRIPTIONS["DistributionLogUpdated"], nl(1),
-    EVENT_DESCRIPTIONS["PublicRelease"], nl(),
     EVENT_DESCRIPTIONS["Initialized"], nl(1),
 )
 
@@ -139,14 +133,6 @@ def el_rewards_stealing_penalty_settled(burnt):
                     Code(burnt), " burnt from bond")
 
 
-@RegisterEventMessage("InitialSlashingSubmitted")
-def initial_slashing_submitted(key, key_url):
-    return markdown("🚨 ", Bold("Initial slashing submitted for one of the validators"), nl(),
-                    "Slashed key: ", TextLink(key, url=key_url), nl(1),
-                    "See the ", TextLink("guide", url="https://docs.lido.fi/staking-modules/csm/guides/slashing"),
-                    " for more details")
-
-
 @RegisterEventMessage("KeyRemovalChargeApplied")
 def key_removal_charge_applied(amount):
     return markdown("🔑 ", Bold("Key removal charge applied"), nl(),
@@ -194,13 +180,6 @@ def node_operator_reward_address_change_proposed(address):
 def node_operator_reward_address_changed(address):
     return markdown("✅ ", Bold("Rewards address changed"), nl(),
                     "New address: ", Code(address))
-
-
-@RegisterEventMessage("StuckSigningKeysCountChanged")
-def stuck_signing_keys_count_changed(count):
-    return markdown("🚨 ", Bold("Stuck keys reported"), nl(),
-                    Code(count), " key(s) were not exited in time. Check ",
-                    TextLink("CSM UI", url=CFG.csm_ui_url or ""), " for more details")
 
 
 @RegisterEventMessage("VettedSigningKeysCountDecreased")
@@ -262,12 +241,6 @@ def strikes_penalty_processed(key, key_url, penalty):
                     "Validator: ", TextLink(key, url=key_url), nl(1),
                     "Penalty amount: ", Code(penalty), nl(),
                     "Penalty will be charged when the validator withdraws")
-
-
-@RegisterEventMessage("PublicRelease")
-def public_release():
-    return markdown("🎉 ", Bold("Public release of CSM is here!"), nl(),
-                    "Now everyone can join the CSM and upload any number of keys.")
 
 
 @RegisterEventMessage("DistributionLogUpdated")
