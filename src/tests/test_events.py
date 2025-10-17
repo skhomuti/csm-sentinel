@@ -3,6 +3,8 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock, patch
 from types import SimpleNamespace
+
+from csm_bot.config import get_config_async, set_config
 from src.csm_bot.texts import target_validators_count_changed
 from hexbytes import HexBytes
 
@@ -226,11 +228,12 @@ async def test_distribution_log_updated_produces_strike_notifications():
     from src.csm_bot.models import Event
     import src.csm_bot.texts as texts
 
-    event_messages = EventMessages.__new__(EventMessages)
-    event_messages.cfg = SimpleNamespace(
+    set_config(SimpleNamespace(
         etherscan_tx_url_template="https://etherscan.io/tx/{}",
-        csm_ui_url=texts.CFG.csm_ui_url,
-    )
+        csm_ui_url="https://csm.lido.fi",
+    ))
+    event_messages = EventMessages.__new__(EventMessages)
+    event_messages.cfg = await get_config_async()
 
     payload = [
         {

@@ -2,23 +2,21 @@ import asyncio
 from collections.abc import Callable
 import pytest
 
-from csm_bot.config import get_config
+from csm_bot.config import get_config, clear_config
 
 from .helpers import replay_transaction_on_anvil, build_subscription
 
 
-@pytest.fixture(autouse=True)
-def force_service_urls(monkeypatch):
+@pytest.fixture(autouse=True, scope="session")
+def force_service_urls():
     """Force URL-based config to stable values for integration tests."""
-    monkeypatch.setenv("ETHERSCAN_URL", "https://etherscan.io")
-    monkeypatch.setenv("BEACONCHAIN_URL", "https://beaconcha.in")
-    monkeypatch.setenv("CSM_UI_URL", "https://csm.lido.fi")
-
-    get_config.cache_clear()
-    try:
+    with pytest.MonkeyPatch.context() as m:
+        m.setenv("ETHERSCAN_URL", "https://etherscan.io")
+        m.setenv("BEACONCHAIN_URL", "https://beaconcha.in")
+        m.setenv("CSM_UI_URL", "https://csm.lido.fi")
+        clear_config()
         yield
-    finally:
-        get_config.cache_clear()
+    clear_config()
 
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.integration]

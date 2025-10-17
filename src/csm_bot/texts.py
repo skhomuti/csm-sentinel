@@ -2,8 +2,6 @@ from aiogram.utils.formatting import Text, Bold, TextLink, Code, Italic
 from web3.constants import ADDRESS_ZERO
 from csm_bot.config import get_config
 
-CFG = get_config()
-
 markdown = lambda *args, **kwargs: Text(*args, **kwargs).as_markdown()
 nl = lambda x=2: "\n" * x
 
@@ -141,11 +139,12 @@ def key_removal_charge_applied(amount):
 
 @RegisterEventMessage("BondCurveSet")
 def bond_curve_set(curve_id: int):
+    cfg = get_config()
     return markdown(
         "ℹ️ ", Bold("Node Operator type changed"), nl(),
         "New type id: ", Code(str(curve_id)), nl(1),
         "Operational requirements may now differ. Check the ",
-        TextLink("CSM UI", url=CFG.csm_ui_url or ""),
+        TextLink("CSM UI", url=cfg.csm_ui_url or ""),
         " for updated guidance"
     )
 
@@ -184,17 +183,19 @@ def node_operator_reward_address_changed(address):
 
 @RegisterEventMessage("VettedSigningKeysCountDecreased")
 def vetted_signing_keys_count_decreased():
+    cfg = get_config()
     return markdown("🚨 ", Bold("Vetted keys count decreased"), nl(),
                     "Consider removing invalid keys. Check ",
-                    TextLink("CSM UI", url=CFG.csm_ui_url or ""), " for more details")
+                    TextLink("CSM UI", url=cfg.csm_ui_url or ""), " for more details")
 
 
 @RegisterEventMessage("WithdrawalSubmitted")
 def withdrawal_submitted(key, key_url, amount):
+    cfg = get_config()
     return markdown("👀 ", Bold("Information about validator withdrawal has been submitted"), nl(),
                     "Withdrawn key: ", TextLink(key, url=key_url),
                     " with exit balance: ", Code(amount), nl(),
-                    "Check the amount of the bond released at ", TextLink("CSM UI", url=CFG.csm_ui_url or ""))
+                    "Check the amount of the bond released at ", TextLink("CSM UI", url=cfg.csm_ui_url or ""))
 
 
 @RegisterEventMessage("TotalSigningKeysCountChanged")
@@ -245,9 +246,10 @@ def strikes_penalty_processed(key, key_url, penalty):
 
 @RegisterEventMessage("DistributionLogUpdated")
 def distribution_data_updated(node_operator_id: int | None=None, striked_validators: list | None=None):
+    cfg = get_config()
     base_message = Text(
         "📈 ", Bold("Rewards distributed!"), nl(),
-        "Follow the ", TextLink("CSM UI", url=CFG.csm_ui_url or ""),
+        "Follow the ", TextLink("CSM UI", url=cfg.csm_ui_url or ""),
         " to check new claimable rewards."
     )
 

@@ -1,10 +1,9 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 
-import pytest
 import pytest_asyncio
 
-from csm_bot.config import get_config
+from csm_bot.config import get_config_async
 
 from .helpers import AnvilInstance, start_anvil, stop_anvil
 
@@ -12,7 +11,7 @@ from .helpers import AnvilInstance, start_anvil, stop_anvil
 @pytest_asyncio.fixture
 async def anvil_launcher(unused_tcp_port_factory) -> Callable[[int], Awaitable[AnvilInstance]]:
     instances: list[AnvilInstance] = []
-    cfg = get_config()
+    cfg = await get_config_async()
     fork_url = cfg.web3_socket_provider
 
     async def _launch(fork_block: int) -> AnvilInstance:

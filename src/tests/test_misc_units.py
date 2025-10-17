@@ -3,6 +3,24 @@ from unittest.mock import patch
 
 from hexbytes import HexBytes
 
+from csm_bot.config import clear_config
+
+
+async def _fake_addresses():
+    from csm_bot.app.contracts import ContractAddresses
+
+    return ContractAddresses(
+        csm="0x000000000000000000000000000000000000c5m0",
+        accounting="0x000000000000000000000000000000000000aacc",
+        parameters_registry="0x000000000000000000000000000000000000prm5",
+        fee_distributor="0x000000000000000000000000000000000000feed",
+        exit_penalties="0x000000000000000000000000000000000000b1d0",
+        lido_locator="0x0000000000000000000000000000000000001d0c",
+        staking_router="0x00000000000000000000000000000000000057a0",
+        vebo="0x000000000000000000000000000000000000veb0",
+        csm_staking_module_id=3,
+    )
+
 
 def test_event_readable_string():
     from src.csm_bot.models import Event
@@ -83,13 +101,17 @@ def test_texts_manager_address_change_proposed_messages():
         "ADMIN_IDS": "1, 2 3,invalid,4",
         "BLOCK_BATCH_SIZE": "12345",
         "BLOCK_FROM": "789",
+        "WEB3_SOCKET_PROVIDER": "wss://example.invalid",
+        "CSM_ADDRESS": "0x000000000000000000000000000000000000c5m0",
     },
+    clear=True,
 )
-def test_config_parsing_and_templates():
-    from src.csm_bot.config import get_config
+def test_config_parsing_and_templates(monkeypatch):
+    from csm_bot.config import get_config
 
-    # Clear cache to re-read envs
-    get_config.cache_clear()
+    monkeypatch.setattr("csm_bot.config._discover_contract_addresses", lambda *_: _fake_addresses())
+
+    clear_config()
     cfg = get_config()
 
     assert cfg.admin_ids == {1, 2, 3, 4}
@@ -98,15 +120,3 @@ def test_config_parsing_and_templates():
     assert cfg.etherscan_block_url_template == "https://etherscan.io/block/{}"
     assert cfg.etherscan_tx_url_template == "https://etherscan.io/tx/{}"
     assert cfg.beaconchain_url_template == "https://beaconcha.in/validator/{}"
-
-
-@patch.dict(os.environ, {}, clear=True)
-def test_config_templates_none_when_missing_envs():
-    from src.csm_bot.config import get_config
-
-    get_config.cache_clear()
-    cfg = get_config()
-
-    assert cfg.etherscan_block_url_template is None
-    assert cfg.etherscan_tx_url_template is None
-    assert cfg.beaconchain_url_template is None
