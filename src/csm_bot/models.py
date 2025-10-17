@@ -5,15 +5,13 @@ from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
 
 CSM_ABI = json.load(open("abi/CSModuleV2.json"))
-
 ACCOUNTING_ABI = json.load(open("abi/CSAccountingV2.json"))
-
 FEE_DISTRIBUTOR_ABI = json.load(open("abi/CSFeeDistributorV2.json"))
-
 EXIT_PENALTIES_ABI = json.load(open("abi/CSExitPenalties.json"))
-
 PARAMETERS_REGISTRY_ABI = json.load(open("abi/CSParametersRegistry.json"))
 VEBO_ABI = json.load(open("abi/VEBO.json"))
+LIDO_LOCATOR_ABI = json.load(open("abi/LidoLocator.json"))
+STAKING_ROUTER_ABI = json.load(open("abi/StakingRouter.json"))
 
 
 @dataclasses.dataclass

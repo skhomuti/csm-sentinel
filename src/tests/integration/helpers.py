@@ -1,7 +1,6 @@
 """Utilities supporting the integration tests."""
 
 import asyncio
-import os
 from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
