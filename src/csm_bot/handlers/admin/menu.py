@@ -16,7 +16,7 @@ from csm_bot.utils import chunk_text
 if TYPE_CHECKING:
     from csm_bot.app.context import BotContext
 
-@admin_only(States.WELCOME)
+@admin_only(failure_state=States.WELCOME)
 async def admin_menu(update: Update, context: "BotContext") -> States:
     query = update.callback_query
     if query is not None:
@@ -30,7 +30,7 @@ async def admin_menu(update: Update, context: "BotContext") -> States:
     return States.ADMIN
 
 
-@admin_only(States.WELCOME)
+@admin_only(failure_state=States.WELCOME)
 async def subscriptions(update: Update, context: "BotContext"):
     query = update.callback_query
     if query is not None:

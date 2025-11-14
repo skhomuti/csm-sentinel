@@ -86,7 +86,12 @@ ADMIN_BROADCAST_ALL = "All subscribers"
 ADMIN_BROADCAST_BY_NO = "By node operator"
 ADMIN_BROADCAST_ENTER_MESSAGE_ALL = "Please enter the message to send to all subscribers:"
 ADMIN_BROADCAST_ENTER_NO_IDS = "Please enter comma-separated node operator IDs (e.g., 1,2,3):"
-ADMIN_BROADCAST_NO_IDS_INVALID = "No valid node operator IDs provided. Please enter comma-separated IDs (e.g., 1,2,3)."
+ADMIN_BROADCAST_NO_IDS_INVALID = "No valid node operator IDs provided."
+ADMIN_BROADCAST_CONFIRM_HINT = "Review the message below and confirm before broadcasting."
+ADMIN_BROADCAST_PREVIEW_ALL = "Broadcast preview for all subscribers:"
+ADMIN_BROADCAST_PREVIEW_SELECTED = "Broadcast preview for: {targets}"
+BUTTON_SEND_BROADCAST = "Send broadcast"
+ADMIN_PRIVATE_CHAT_REQUIRED = "Admin tools are only available in a private chat with the bot. Please open a private chat to continue."
 NO_NEW_BLOCKS_ADMIN_ALERT = (
     "⚠️ No new blocks processed in the last {minutes} minutes. Latest block: {block}"
 )
