@@ -176,7 +176,7 @@ def node_operator_reward_address_change_proposed(address):
         return markdown("ℹ️ ", Bold("Proposed reward address revoked"))
     else:
         return markdown("ℹ️ ", Bold("New rewards address proposed"), nl(),
-                        "Proposed address: ", Code(address),
+                        "Proposed address: ", Code(address), nl(1),
                         "To complete the change, the Node Operator must confirm it from the new address.")
 
 
