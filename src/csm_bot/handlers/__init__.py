@@ -88,7 +88,7 @@ def build_conversation_handler() -> ConversationHandler:
                 MessageHandler(text_without_commands, broadcast_enter_no_ids_message),
             ],
             States.ADMIN_BROADCAST_MESSAGE_SELECTED: [
-                CallbackQueryHandler(broadcast_menu, pattern="^" + Callback.BACK.value + "$"),
+                CallbackQueryHandler(broadcast_by_no, pattern="^" + Callback.BACK.value + "$"),
                 CallbackQueryHandler(
                     broadcast_selected_confirm,
                     pattern="^" + Callback.ADMIN_BROADCAST_CONFIRM_SELECTED.value + "$",

@@ -136,7 +136,7 @@ async def broadcast_all_message(update: Update, context: "BotContext") -> States
     if chat_id is None:
         return States.ADMIN_BROADCAST_MESSAGE_ALL
     session = BroadcastSession(context)
-    text = (message.text or "").strip() if message and message.text else ""
+    text = (message.text or "").strip() if message else ""
     await _delete_user_message(message)
 
     if not text:
@@ -166,7 +166,7 @@ async def broadcast_enter_no_ids_message(update: Update, context: "BotContext") 
         return States.ADMIN_BROADCAST_SELECT_NO
     session = BroadcastSession(context)
 
-    raw_input = (message.text or "").strip() if message and message.text else ""
+    raw_input = (message.text or "").strip() if message else ""
     await _delete_user_message(message)
 
     if not raw_input:
@@ -215,7 +215,7 @@ async def broadcast_selected_message(update: Update, context: "BotContext") -> S
     if chat_id is None:
         return States.ADMIN_BROADCAST_MESSAGE_SELECTED
     session = BroadcastSession(context)
-    text = (message.text or "").strip() if message and message.text else ""
+    text = (message.text or "").strip() if message else ""
     await _delete_user_message(message)
 
     selected = session.get_selected_ids()
