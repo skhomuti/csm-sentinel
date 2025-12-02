@@ -1,0 +1,24 @@
+name: copilot-cli
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  models: read
+
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/setup-node@v4
+          with:
+            node-version: '22'
+        - name: Start Codex proxy
+          uses: openai/codex-action@v1
+          with:
+            openai-api-key: ${{ secrets.GITHUB_TOKEN }}
+            responses-api-endpoint: "https://models.github.ai/inference/chat/completions"
+            prompt: "say hello"
+            model: "gpt-4o"
