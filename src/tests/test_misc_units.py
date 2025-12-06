@@ -1,7 +1,9 @@
+import asyncio
 import os
 from unittest.mock import patch
 
 from hexbytes import HexBytes
+import pytest
 
 from csm_bot.config import clear_config
 
@@ -100,6 +102,7 @@ def test_texts_manager_address_change_proposed_messages():
         "BEACONCHAIN_URL": "https://beaconcha.in",
         "ADMIN_IDS": "1, 2 3,invalid,4",
         "BLOCK_BATCH_SIZE": "12345",
+        "PROCESS_BLOCKS_REQUESTS_PER_SECOND": "3.5",
         "BLOCK_FROM": "789",
         "WEB3_SOCKET_PROVIDER": "wss://example.invalid",
         "CSM_ADDRESS": "0x000000000000000000000000000000000000c5m0",
@@ -116,7 +119,41 @@ def test_config_parsing_and_templates(monkeypatch):
 
     assert cfg.admin_ids == {1, 2, 3, 4}
     assert cfg.block_batch_size == 12345
+    assert cfg.process_blocks_requests_per_second == 3.5
     assert cfg.block_from == 789
     assert cfg.etherscan_block_url_template == "https://etherscan.io/block/{}"
     assert cfg.etherscan_tx_url_template == "https://etherscan.io/tx/{}"
     assert cfg.beaconchain_url_template == "https://beaconcha.in/validator/{}"
+    clear_config()
+
+
+@pytest.mark.asyncio
+@patch.dict(
+    os.environ,
+    {
+        "WEB3_SOCKET_PROVIDER": "wss://example.invalid",
+        "CSM_ADDRESS": "0x000000000000000000000000000000000000c5m0",
+        "PROCESS_BLOCKS_REQUESTS_PER_SECOND": "2",
+    },
+    clear=True,
+)
+async def test_process_blocks_rate_limit(monkeypatch):
+    from csm_bot.config import get_config_async
+    from csm_bot.rpc import Subscription
+
+    monkeypatch.setattr("csm_bot.config._discover_contract_addresses", lambda *_: _fake_addresses())
+
+    class DummyW3:
+        provider = None
+
+    clear_config()
+    await get_config_async()
+    subscription = Subscription(DummyW3())
+    try:
+        start = asyncio.get_running_loop().time()
+        await subscription._throttle_process_blocks_request()
+        await subscription._throttle_process_blocks_request()
+        elapsed = asyncio.get_running_loop().time() - start
+        assert elapsed >= 0.45
+    finally:
+        clear_config()
