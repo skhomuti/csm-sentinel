@@ -44,6 +44,7 @@ class Config:
 
     # Other
     block_batch_size: int
+    process_blocks_requests_per_second: float | None
     block_from: int | None
     admin_ids: set[int]
 
@@ -84,6 +85,14 @@ async def _build_config_from_env() -> Config:
     except asyncio.TimeoutError as exc:
         raise RuntimeError("Timed out discovering contract addresses from WEB3 provider") from exc
 
+    process_blocks_requests_per_second = os.getenv("PROCESS_BLOCKS_REQUESTS_PER_SECOND")
+    if process_blocks_requests_per_second:
+        process_blocks_requests_per_second = float(process_blocks_requests_per_second)
+        if process_blocks_requests_per_second <= 0:
+            raise RuntimeError("PROCESS_BLOCKS_REQUESTS_PER_SECOND must be positive")
+    else:
+        process_blocks_requests_per_second = None
+
     return Config(
         filestorage_path=filestorage_path,
         token=token,
@@ -101,6 +110,7 @@ async def _build_config_from_env() -> Config:
         beaconchain_url=os.getenv("BEACONCHAIN_URL"),
         csm_ui_url=os.getenv("CSM_UI_URL"),
         block_batch_size=int(os.getenv("BLOCK_BATCH_SIZE", 10_000)),
+        process_blocks_requests_per_second=process_blocks_requests_per_second,
         block_from=(int(os.getenv("BLOCK_FROM")) if os.getenv("BLOCK_FROM") else None),
         admin_ids=_parse_admin_ids(os.getenv("ADMIN_IDS", "")),
     )

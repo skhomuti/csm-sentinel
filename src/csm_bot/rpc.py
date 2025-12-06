@@ -54,6 +54,9 @@ class Subscription:
             EXIT_PENALTIES_ABI,
         )
         self.cfg = get_config()
+        rps_limit = self.cfg.process_blocks_requests_per_second
+        self._process_blocks_request_interval = (1 / rps_limit) if rps_limit else None
+        self._last_process_blocks_request_ts: float | None = None
 
     @property
     async def w3(self):
@@ -170,6 +173,7 @@ class Subscription:
                     toBlock=batch_end,
                     address=contract,
                 )
+                await self._throttle_process_blocks_request()
                 try:
                     logs = await w3.eth.get_logs(filter_params)
                 except web3.exceptions.Web3Exception as e:
@@ -197,6 +201,21 @@ class Subscription:
                 break
             await self.process_new_block(Block(number=batch_end))
             logger.debug("Processed blocks up to %s", batch_end)
+
+
+    async def _throttle_process_blocks_request(self):
+        if self._process_blocks_request_interval is None:
+            return
+        loop = asyncio.get_running_loop()
+        now = loop.time()
+        if self._last_process_blocks_request_ts is not None:
+            elapsed = now - self._last_process_blocks_request_ts
+            sleep_for = self._process_blocks_request_interval - elapsed
+            if sleep_for > 0:
+                logger.debug("Throttling process_blocks_from requests for %.3fs", sleep_for)
+                await asyncio.sleep(sleep_for)
+                now = loop.time()
+        self._last_process_blocks_request_ts = now
 
 
     async def _handle_new_block_subscription(self, context: NewHeadsSubscriptionContext):

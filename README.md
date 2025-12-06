@@ -64,6 +64,9 @@ In general, you don't need to set this variable.
 `BLOCK_BATCH_SIZE` controls how many blocks are fetched per RPC request when processing historical events.
 The default value is `10000`.
 
+`PROCESS_BLOCKS_REQUESTS_PER_SECOND` caps how many historical RPC requests `process_blocks_from`
+issues per second when backfilling. Leave unset to disable throttling.
+
 ## Admin access (ADMIN_IDS)
 
 Some maintenance commands are restricted to admins. To enable them, set your Telegram user ID in the `ADMIN_IDS` environment variable.
