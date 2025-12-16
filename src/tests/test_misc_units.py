@@ -40,7 +40,7 @@ def test_event_readable_string():
 
 
 def test_main_subscription_helpers_counts():
-    from src.csm_bot.handlers.utils import get_active_subscription_counts
+    from src.csm_bot.handlers.utils import get_active_subscription_counts, get_subscription_totals
     from src.csm_bot.app.storage import BotStorage
 
     bot_data = {
@@ -64,6 +64,10 @@ def test_main_subscription_helpers_counts():
     assert counts["20"]["users"] == 0
     assert counts["20"]["groups"] == 1
     assert counts["20"]["channels"] == 0
+
+    subscribers, node_operators = get_subscription_totals(storage)
+    assert subscribers == 2  # chat ids 1 and 2 are active across all NOs
+    assert node_operators == 2
 
 
 def test_main_resolve_target_chats():

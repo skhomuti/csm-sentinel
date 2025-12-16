@@ -45,3 +45,10 @@ def resolve_target_chats_for_node_operators(
 def get_active_subscription_counts(storage: BotStorage) -> dict[str, dict[str, int]]:
     """Compute active subscription counts per node operator, broken down by chat type."""
     return storage.subscription_counts()
+
+
+def get_subscription_totals(storage: BotStorage) -> tuple[int, int]:
+    """Return total active subscribers and node operators with active subscriptions."""
+    active_counts = storage.subscription_counts()
+    active_subscribers = storage.resolve_target_chats(storage.node_operator_chats.ids())
+    return len(active_subscribers), len(active_counts)
