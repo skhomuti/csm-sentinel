@@ -4,7 +4,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 
 from csm_bot.handlers.admin.common import admin_only
 from csm_bot.handlers.state import Callback, States
-from csm_bot.handlers.utils import get_active_subscription_counts
+from csm_bot.handlers.utils import get_active_subscription_counts, get_subscription_totals
 from csm_bot.texts import (
     ADMIN_BUTTON_BROADCAST,
     ADMIN_BUTTON_SUBSCRIPTIONS,
@@ -41,10 +41,17 @@ async def subscriptions(update: Update, context: "BotContext"):
     if not counts:
         full_text = "No active subscriptions."
     else:
+        total_subscribers, active_node_operators = get_subscription_totals(context.bot_storage)
         def sort_key(k: str):
             return (0, int(k)) if k.isdigit() else (1, k)
 
-        lines = ["Active subscriptions:"]
+        subscriber_word = "subscriber" if total_subscribers == 1 else "subscribers"
+        node_operator_word = "node operator" if active_node_operators == 1 else "node operators"
+
+        lines = [
+            f"Active subscriptions: {total_subscribers} {subscriber_word} across "
+            f"{active_node_operators} {node_operator_word}."
+        ]
         for no_id in sorted(counts.keys(), key=sort_key):
             c = counts[no_id]
             sub_word = "subscriber" if c["total"] == 1 else "subscribers"
