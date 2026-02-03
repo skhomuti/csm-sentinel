@@ -1,7 +1,5 @@
-import aiohttp
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, patch
 from types import SimpleNamespace
 
 from csm_bot.config import get_config_async, set_config
@@ -15,6 +13,19 @@ class _DummyConnectProvider:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         return False
+
+
+class _FakeFetcher:
+    def __init__(self, result=None, exc: Exception | None = None):
+        self.result = result
+        self.exc = exc
+        self.calls: list[str] = []
+
+    async def __call__(self, log_cid: str):
+        self.calls.append(log_cid)
+        if self.exc is not None:
+            raise self.exc
+        return self.result
 
 def test_limit_set_mode_1():
     result = target_validators_count_changed(0, 0, 1, 10)
@@ -104,93 +115,45 @@ def test_limit_unset_mode_zero():
     assert result == expected
 
 @pytest.mark.asyncio
-@patch.dict('os.environ', {
-    'ETHERSCAN_URL': 'https://etherscan.io',
-    'BEACONCHAIN_URL': 'https://beaconcha.in',
-    'CSM_ADDRESS': '0x1234567890123456789012345678901234567890',
-    'ACCOUNTING_ADDRESS': '0x1234567890123456789012345678901234567890'
-})
-@patch('aiohttp.ClientSession.get')
-async def test_fetch_distribution_log_success(mock_get):
+async def test_fetch_distribution_log_success():
     from src.csm_bot.events import EventMessages
 
-    response = AsyncMock()
-    response.status = 200
-    response.json = AsyncMock(return_value={"operators": {"123": {}}})
-
-    context_manager = AsyncMock()
-    context_manager.__aenter__.return_value = response
-    context_manager.__aexit__.return_value = None
-    mock_get.return_value = context_manager
-
     event_messages = EventMessages.__new__(EventMessages)
+    fetcher = _FakeFetcher(result={"operators": {"123": {}}})
+    event_messages._distribution_log_fetcher = fetcher
 
     data = await event_messages._fetch_distribution_log("QmCID")
 
     assert data == {"operators": {"123": {}}}
-    mock_get.assert_called_once_with("https://ipfs.io/ipfs/QmCID")
+    assert fetcher.calls == ["QmCID"]
 
 
 @pytest.mark.asyncio
-@patch.dict('os.environ', {
-    'ETHERSCAN_URL': 'https://etherscan.io',
-    'BEACONCHAIN_URL': 'https://beaconcha.in',
-    'CSM_ADDRESS': '0x1234567890123456789012345678901234567890',
-    'ACCOUNTING_ADDRESS': '0x1234567890123456789012345678901234567890'
-})
-@patch('aiohttp.ClientSession.get')
-async def test_fetch_distribution_log_caches(mock_get):
+async def test_fetch_distribution_log_caches():
     from src.csm_bot.events import EventMessages
 
-    response = AsyncMock()
-    response.status = 200
-    response.json = AsyncMock(return_value={"operators": {}})
-
-    context_manager = AsyncMock()
-    context_manager.__aenter__.return_value = response
-    context_manager.__aexit__.return_value = None
-    mock_get.return_value = context_manager
-
     event_messages = EventMessages.__new__(EventMessages)
+    fetcher = _FakeFetcher(result={"operators": {}})
+    event_messages._distribution_log_fetcher = fetcher
 
     await event_messages._fetch_distribution_log("QmCID")
     await event_messages._fetch_distribution_log("QmCID")
 
-    mock_get.assert_called_once()
+    assert fetcher.calls == ["QmCID"]
 
 
 @pytest.mark.asyncio
-@patch.dict('os.environ', {
-    'ETHERSCAN_URL': 'https://etherscan.io',
-    'BEACONCHAIN_URL': 'https://beaconcha.in',
-    'CSM_ADDRESS': '0x1234567890123456789012345678901234567890',
-    'ACCOUNTING_ADDRESS': '0x1234567890123456789012345678901234567890'
-})
-@patch('aiohttp.ClientSession.get')
-async def test_fetch_distribution_log_handles_http_error(mock_get):
+async def test_fetch_distribution_log_handles_error():
     from src.csm_bot.events import EventMessages
 
-    response = AsyncMock()
-    response.status = 404
-
-    context_manager = AsyncMock()
-    context_manager.__aenter__.return_value = response
-    context_manager.__aexit__.return_value = None
-    mock_get.return_value = context_manager
-
     event_messages = EventMessages.__new__(EventMessages)
+    event_messages._distribution_log_fetcher = _FakeFetcher(exc=RuntimeError("boom"))
 
-    with pytest.raises(aiohttp.ClientError):
+    with pytest.raises(RuntimeError):
         await event_messages._fetch_distribution_log("QmCID")
 
 
 @pytest.mark.asyncio
-@patch.dict('os.environ', {
-    'ETHERSCAN_URL': 'https://etherscan.io',
-    'BEACONCHAIN_URL': 'https://beaconcha.in',
-    'CSM_ADDRESS': '0x1234567890123456789012345678901234567890',
-    'ACCOUNTING_ADDRESS': '0x1234567890123456789012345678901234567890'
-})
 async def test_fetch_distribution_log_requires_cid():
     from src.csm_bot.events import EventMessages
 
@@ -201,22 +164,11 @@ async def test_fetch_distribution_log_requires_cid():
 
 
 @pytest.mark.asyncio
-@patch.dict('os.environ', {
-    'ETHERSCAN_URL': 'https://etherscan.io',
-    'BEACONCHAIN_URL': 'https://beaconcha.in',
-    'CSM_ADDRESS': '0x1234567890123456789012345678901234567890',
-    'ACCOUNTING_ADDRESS': '0x1234567890123456789012345678901234567890'
-})
-@patch('aiohttp.ClientSession.get')
-async def test_fetch_distribution_log_handles_timeout(mock_get):
+async def test_fetch_distribution_log_handles_timeout():
     from src.csm_bot.events import EventMessages
 
-    context_manager = AsyncMock()
-    context_manager.__aenter__.side_effect = asyncio.TimeoutError("timeout")
-    context_manager.__aexit__.return_value = None
-    mock_get.return_value = context_manager
-
     event_messages = EventMessages.__new__(EventMessages)
+    event_messages._distribution_log_fetcher = _FakeFetcher(exc=asyncio.TimeoutError("timeout"))
 
     with pytest.raises(asyncio.TimeoutError):
         await event_messages._fetch_distribution_log("QmCID")
@@ -230,7 +182,7 @@ async def test_distribution_log_updated_produces_strike_notifications():
 
     set_config(SimpleNamespace(
         etherscan_tx_url_template="https://etherscan.io/tx/{}",
-        csm_ui_url="https://csm.lido.fi",
+        module_ui_url="https://csm.lido.fi",
     ))
     event_messages = EventMessages.__new__(EventMessages)
     event_messages.cfg = await get_config_async()
@@ -259,7 +211,7 @@ async def test_distribution_log_updated_produces_strike_notifications():
         fetch_calls.append(log_cid)
         return payload
 
-    event_messages._fetch_distribution_log = fake_fetch
+    event_messages._distribution_log_fetcher = fake_fetch
 
     event = Event(
         event="DistributionLogUpdated",
@@ -290,14 +242,82 @@ async def test_distribution_log_updated_produces_strike_notifications():
 
 
 @pytest.mark.asyncio
+async def test_distribution_log_updated_handles_empty_payload():
+    from src.csm_bot.events import EventMessages, NotificationPlan
+    from src.csm_bot.models import Event
+    import src.csm_bot.texts as texts
+
+    set_config(SimpleNamespace(
+        etherscan_tx_url_template="https://etherscan.io/tx/{}",
+        module_ui_url="https://csm.lido.fi",
+    ))
+    event_messages = EventMessages.__new__(EventMessages)
+    event_messages.cfg = await get_config_async()
+    event_messages._distribution_log_fetcher = _FakeFetcher(result={})
+
+    event = Event(
+        event="DistributionLogUpdated",
+        args={"logCid": "cid123"},
+        block=123,
+        tx=HexBytes("0xdeadbeef"),
+        address="0x0000000000000000000000000000000000000000",
+    )
+
+    plan = await EventMessages.distribution_log_updated(event_messages, event)
+
+    assert isinstance(plan, NotificationPlan)
+    assert plan.per_node_operator == {}
+    assert plan.broadcast_node_operator_ids is None
+    expected_base = texts.distribution_data_updated()
+    expected_foot = event_messages.footer(event)
+    assert plan.broadcast == f"{expected_base}{expected_foot}"
+
+
+@pytest.mark.asyncio
+async def test_get_notification_plan_skips_disallowed_event():
+    from src.csm_bot.events import EventMessages
+    from src.csm_bot.models import Event
+
+    class DummyAdapter:
+        def allowed_events(self):
+            return set()
+
+        async def event_enricher(self, event, messages):
+            return None
+
+    event_messages = EventMessages.__new__(EventMessages)
+    event_messages.module_adapter = DummyAdapter()
+
+    event = Event(
+        event="DepositedSigningKeysCountChanged",
+        args={"nodeOperatorId": 321, "depositedKeysCount": 1},
+        block=1,
+        tx=HexBytes("0xdeadbeef"),
+        address="0x0000000000000000000000000000000000000000",
+    )
+
+    plan = await EventMessages.get_notification_plan(event_messages, event)
+
+    assert plan is None
+
+
+@pytest.mark.asyncio
 async def test_get_notification_plan_sets_node_operator_target():
     from src.csm_bot.events import EventMessages, NotificationPlan
     from src.csm_bot.models import Event
+
+    class DummyAdapter:
+        def allowed_events(self):
+            return {"DepositedSigningKeysCountChanged"}
+
+        async def event_enricher(self, event, messages):
+            return None
 
     event_messages = EventMessages.__new__(EventMessages)
     event_messages.connectProvider = _DummyConnectProvider()
     event_messages.cfg = SimpleNamespace(etherscan_tx_url_template="https://etherscan.io/tx/{}")
     event_messages.footer = EventMessages.footer.__get__(event_messages)
+    event_messages.module_adapter = DummyAdapter()
 
     event = Event(
         event="DepositedSigningKeysCountChanged",
@@ -312,3 +332,35 @@ async def test_get_notification_plan_sets_node_operator_target():
     assert isinstance(plan, NotificationPlan)
     assert plan.broadcast_node_operator_ids == {"321"}
     assert plan.broadcast is not None
+
+
+@pytest.mark.asyncio
+async def test_get_notification_plan_uses_adapter_override():
+    from src.csm_bot.events import EventMessages, NotificationPlan
+    from src.csm_bot.models import Event
+
+    class DummyAdapter:
+        def allowed_events(self):
+            return {"BondCurveSet"}
+
+        async def event_enricher(self, event, messages):
+            if event.event == "BondCurveSet":
+                return "override"
+            return None
+
+    event_messages = EventMessages.__new__(EventMessages)
+    event_messages.connectProvider = _DummyConnectProvider()
+    event_messages.module_adapter = DummyAdapter()
+
+    event = Event(
+        event="BondCurveSet",
+        args={"curveId": 1},
+        block=1,
+        tx=HexBytes("0xdeadbeef"),
+        address="0x0000000000000000000000000000000000000000",
+    )
+
+    plan = await EventMessages.get_notification_plan(event_messages, event)
+
+    assert isinstance(plan, NotificationPlan)
+    assert plan.broadcast == "override"

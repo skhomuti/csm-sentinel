@@ -3,6 +3,8 @@ import logging
 import os
 from dataclasses import dataclass
 
+from csm_bot.module_types import ModuleType
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,7 +29,7 @@ class Config:
     web3_socket_provider: str
 
     # Addresses and IDs
-    csm_address: str
+    module_address: str
     accounting_address: str
     parameters_registry_address: str
     vebo_address: str
@@ -35,12 +37,13 @@ class Config:
     exit_penalties_address: str
     lido_locator_address: str
     staking_router_address: str
-    csm_staking_module_id: int
+    staking_module_id: int
+    module_type: ModuleType
 
     # URLs
     etherscan_url: str | None
     beaconchain_url: str | None
-    csm_ui_url: str | None
+    module_ui_url: str | None
 
     # Other
     block_batch_size: int
@@ -70,16 +73,20 @@ async def _build_config_from_env() -> Config:
     filestorage_path = os.getenv("FILESTORAGE_PATH", ".storage")
     token = os.getenv("TOKEN")
     web3_socket_provider = os.getenv("WEB3_SOCKET_PROVIDER")
-    csm_address = os.getenv("CSM_ADDRESS")
+    raw_module_address = os.getenv("MODULE_ADDRESS")
+    raw_csm_address = os.getenv("CSM_ADDRESS")
+    if raw_csm_address:
+        logger.warning("CSM_ADDRESS is deprecated; use MODULE_ADDRESS instead.")
+    module_address = raw_module_address or raw_csm_address
 
     if not web3_socket_provider:
         raise RuntimeError("WEB3_SOCKET_PROVIDER must be configured")
-    if not csm_address:
-        raise RuntimeError("CSM_ADDRESS must be configured")
+    if not module_address:
+        raise RuntimeError("MODULE_ADDRESS or CSM_ADDRESS must be configured")
 
     try:
         addresses = await asyncio.wait_for(
-            _discover_contract_addresses(web3_socket_provider, csm_address),
+            _discover_contract_addresses(web3_socket_provider, module_address),
             timeout=RPC_DISCOVERY_TIMEOUT_SECONDS,
         )
     except asyncio.TimeoutError as exc:
@@ -93,11 +100,17 @@ async def _build_config_from_env() -> Config:
     else:
         process_blocks_requests_per_second = None
 
+    raw_module_ui_url = os.getenv("MODULE_UI_URL")
+    raw_csm_ui_url = os.getenv("CSM_UI_URL")
+    if raw_csm_ui_url:
+        logger.warning("CSM_UI_URL is deprecated; use MODULE_UI_URL instead.")
+    module_ui_url = raw_module_ui_url or raw_csm_ui_url
+
     return Config(
         filestorage_path=filestorage_path,
         token=token,
         web3_socket_provider=web3_socket_provider,
-        csm_address=addresses.csm,
+        module_address=addresses.module,
         accounting_address=addresses.accounting,
         parameters_registry_address=addresses.parameters_registry,
         vebo_address=addresses.vebo,
@@ -105,10 +118,11 @@ async def _build_config_from_env() -> Config:
         exit_penalties_address=addresses.exit_penalties,
         lido_locator_address=addresses.lido_locator,
         staking_router_address=addresses.staking_router,
-        csm_staking_module_id=addresses.csm_staking_module_id,
+        staking_module_id=addresses.staking_module_id,
+        module_type=addresses.module_type,
         etherscan_url=os.getenv("ETHERSCAN_URL"),
         beaconchain_url=os.getenv("BEACONCHAIN_URL"),
-        csm_ui_url=os.getenv("CSM_UI_URL"),
+        module_ui_url=module_ui_url,
         block_batch_size=int(os.getenv("BLOCK_BATCH_SIZE", 10_000)),
         process_blocks_requests_per_second=process_blocks_requests_per_second,
         block_from=(int(os.getenv("BLOCK_FROM")) if os.getenv("BLOCK_FROM") else None),
@@ -146,7 +160,7 @@ def clear_config() -> None:
     _CONFIG = None
 
 
-async def _discover_contract_addresses(provider_url: str, csm_address: str):
+async def _discover_contract_addresses(provider_url: str, module_address: str):
     from csm_bot.app.contracts import discover_contract_addresses_from_url
 
-    return await discover_contract_addresses_from_url(provider_url, csm_address)
+    return await discover_contract_addresses_from_url(provider_url, module_address)

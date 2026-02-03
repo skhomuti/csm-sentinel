@@ -16,13 +16,13 @@ from web3._utils.events import get_event_data
 from web3.types import EventData, FilterParams
 from websockets import ConnectionClosed
 
-from csm_bot.events import EVENTS_TO_FOLLOW
 from csm_bot.utils import normalize_block_number
 from csm_bot.config import get_config
+from csm_bot.texts import EVENT_DESCRIPTIONS
 from csm_bot.models import (
     Event,
     Block,
-    CSM_ABI,
+    MODULE_ABI,
     VEBO_ABI,
     FEE_DISTRIBUTOR_ABI,
     EXIT_PENALTIES_ABI,
@@ -33,21 +33,22 @@ logger = logging.getLogger(__name__)
 logging.getLogger("web3.providers.persistent.subscription_manager").setLevel(logging.WARNING)
 
 
-def topics_to_follow(*abis) -> dict:
+def topics_to_follow(allowed_events: set[str], *abis) -> dict:
     topics = {}
     for event in [event for abi in abis for event in get_all_event_abis(abi)]:
-        if event["name"] in EVENTS_TO_FOLLOW.keys():
+        if event["name"] in allowed_events:
             topics[event_abi_to_log_topic(event)] = event
     return topics
 
 
 class Subscription:
-    def __init__(self, w3: AsyncWeb3):
+    def __init__(self, w3: AsyncWeb3, allowed_events: set[str]):
         super().__init__()
         self._shutdown_event = asyncio.Event()
         self._w3 = w3
         self.abi_by_topics = topics_to_follow(
-            CSM_ABI,
+            allowed_events,
+            MODULE_ABI,
             ACCOUNTING_ABI,
             FEE_DISTRIBUTOR_ABI,
             VEBO_ABI,
@@ -99,7 +100,7 @@ class Subscription:
     @staticmethod
     def _filter_vebo_exit_requests(event: Event):
         cfg = get_config()
-        return cfg.csm_staking_module_id is not None and event.args["stakingModuleId"] == cfg.csm_staking_module_id
+        return cfg.staking_module_id is not None and event.args["stakingModuleId"] == cfg.staking_module_id
 
     @reconnect
     async def subscribe(self):
@@ -109,8 +110,8 @@ class Subscription:
             vebo = w3.eth.contract(address=self.cfg.vebo_address, abi=VEBO_ABI)
             fee_distributor = w3.eth.contract(address=self.cfg.fee_distributor_address, abi=FEE_DISTRIBUTOR_ABI)
 
-            subs_csm = LogsSubscription(
-                address=self.cfg.csm_address,
+            subs_module = LogsSubscription(
+                address=self.cfg.module_address,
                 handler=self._handle_event_log_subscription
             )
             subs_acc = LogsSubscription(
@@ -134,7 +135,7 @@ class Subscription:
             )
 
             subs_heads = NewHeadsSubscription(handler=self._handle_new_block_subscription)
-            await w3.subscription_manager.subscribe([subs_csm, subs_acc, subs_vebo, subs_fd, subs_ep, subs_heads])
+            await w3.subscription_manager.subscribe([subs_module, subs_acc, subs_vebo, subs_fd, subs_ep, subs_heads])
             logger.info("Subscriptions started")
 
             await w3.subscription_manager.handle_subscriptions()
@@ -154,7 +155,7 @@ class Subscription:
         for batch_start in range(start_block, end_block + 1, batch_size):
             batch_end = min(batch_start + batch_size - 1, end_block)
             contracts = [
-                self.cfg.csm_address,
+                self.cfg.module_address,
                 self.cfg.accounting_address,
                 self.cfg.fee_distributor_address,
                 self.cfg.vebo_address,
@@ -256,4 +257,5 @@ class TerminalSubscription(Subscription):
 if __name__ == '__main__':
     provider = AsyncWeb3(WebSocketProvider(os.getenv("WEB3_SOCKET_PROVIDER")))
 
-    asyncio.run(TerminalSubscription(provider).subscribe())
+    allowed_events = set(EVENT_DESCRIPTIONS.keys())
+    asyncio.run(TerminalSubscription(provider, allowed_events).subscribe())

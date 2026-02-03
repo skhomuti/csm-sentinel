@@ -8,7 +8,6 @@ from csm_bot.handlers.tracking import add_user_if_required
 from csm_bot.handlers.utils import is_admin, reply_with_markup
 from csm_bot.texts import (
     BUTTON_BACK,
-    EVENT_LIST_TEXT,
     FOLLOW_NODE_OPERATOR_FOLLOWING,
     FOLLOW_NODE_OPERATOR_TEXT,
     NODE_OPERATOR_CANT_FOLLOW,
@@ -118,7 +117,7 @@ async def follow_node_operator_message(update: Update, context: "BotContext") ->
 
     runtime = context.runtime
     async with runtime.event_messages.connectProvider:
-        node_operators_count = await runtime.event_messages.csm.functions.getNodeOperatorsCount().call()
+        node_operators_count = await runtime.event_messages.module.functions.getNodeOperatorsCount().call()
 
     if node_operator_id.isdigit() and int(node_operator_id) < node_operators_count:
         chat_storage = context.chat_storage()
@@ -198,7 +197,7 @@ async def followed_events(update: Update, context: "BotContext") -> States:
 
     keyboard = [InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK.value)]
     await query.edit_message_text(
-        text=EVENT_LIST_TEXT,
+        text=context.runtime.module_adapter.build_event_list_text(),
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup([keyboard]),
     )

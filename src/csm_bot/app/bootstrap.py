@@ -6,6 +6,7 @@ from telegram.ext import AIORateLimiter, ApplicationBuilder, ContextTypes
 from web3 import AsyncWeb3, WebSocketProvider
 
 from csm_bot.app.context import BotContext
+from csm_bot.app.module_adapter import build_module_adapter_from_config
 from csm_bot.app.runtime import BotRuntime, attach_runtime
 from csm_bot.app.storage import create_persistence
 from csm_bot.config import get_config
@@ -44,8 +45,14 @@ def create_runtime() -> BotRuntime:
         WebSocketProvider(cfg.web3_socket_provider, max_connection_retries=-1)
     )
 
-    event_messages = EventMessages(rpc_provider)
-    subscription = TelegramSubscription(persistent_provider, application, event_messages)
+    module_adapter = build_module_adapter_from_config(cfg, rpc_provider)
+    event_messages = EventMessages(rpc_provider, module_adapter)
+    subscription = TelegramSubscription(
+        persistent_provider,
+        application,
+        event_messages,
+        module_adapter.allowed_events(),
+    )
     job_context = JobContext()
 
     runtime = BotRuntime(
@@ -54,6 +61,7 @@ def create_runtime() -> BotRuntime:
         subscription=subscription,
         event_messages=event_messages,
         job_context=job_context,
+        module_adapter=module_adapter,
     )
     attach_runtime(runtime)
     return runtime
