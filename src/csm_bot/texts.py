@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+from enum import StrEnum
+
 from aiogram.utils.formatting import Text, Bold, TextLink, Code, Italic
 from web3.constants import ADDRESS_ZERO
 from csm_bot.config import get_config
@@ -16,59 +19,171 @@ class RegisterEventMessage:
 
 
 EVENT_MESSAGES = {}
-EVENT_DESCRIPTIONS = {
-    "DepositedSigningKeysCountChanged": "- 🤩 Node Operator's keys received deposits",
-    "ELRewardsStealingPenaltyReported": "- 🚨 Penalty for stealing EL rewards reported",
-    "ELRewardsStealingPenaltySettled": "- 🚨 EL rewards stealing penalty confirmed and applied",
-    "ELRewardsStealingPenaltyCancelled": "- 😮‍💨 Cancelled penalty for stealing EL rewards",
-    "KeyRemovalChargeApplied": "- 🔑 Applied charge for key removal",
-    "BondCurveSet": "- ℹ️ Node Operator type changed",
-    "NodeOperatorManagerAddressChangeProposed": "- ℹ️ New manager address proposed",
-    "NodeOperatorManagerAddressChanged": "- ✅ Manager address changed",
-    "NodeOperatorRewardAddressChangeProposed": "- ℹ️ New rewards address proposed",
-    "NodeOperatorRewardAddressChanged": "- ✅ Rewards address changed",
-    "VettedSigningKeysCountDecreased": "- 🚨 Uploaded invalid keys",
-    "WithdrawalSubmitted": "- 👀 Key withdrawal information submitted",
-    "ValidatorExitDelayProcessed": "- 🚨 Exit delay processed; penalty queued for withdrawal",
-    "TriggeredExitFeeRecorded": "- 🚨 Triggered exit fee recorded; penalty will be charged on exit",
-    "StrikesPenaltyProcessed": "- 🚨 Strikes penalty processed; validator exited for poor performance",
-    "TotalSigningKeysCountChanged": "- 👀 New keys uploaded or removed",
-    "ValidatorExitRequest": "- 🚨 One of the validators requested to exit",
-    "DistributionLogUpdated": "- 📈 New rewards distributed",
-    "TargetValidatorsCountChanged": "- 🚨 Target validators count changed",
-    "Initialized": "- 🎉 CSM v2 launched on mainnet",
+
+
+@dataclass(frozen=True, slots=True)
+class EventDefinition:
+    name: str
+    description: str
+
+    group_title: "EventGroup"
+
+
+class EventGroup(StrEnum):
+    KEY_MANAGEMENT = "Key Management Events:"
+    ADDRESS_AND_REWARD_CHANGES = "Address and Reward Changes:"
+    SLASHING_AND_STEALING = "Slashing and Stealing Events:"
+    WITHDRAWAL_AND_EXIT = "Withdrawal and Exit Requests:"
+    COMMON_CSM = "Common CSM Events for all the Node Operators:"
+
+
+GROUP_DESCRIPTIONS: dict[EventGroup, str] = {
+    EventGroup.KEY_MANAGEMENT: "Changes related to keys and their status.",
+    EventGroup.ADDRESS_AND_REWARD_CHANGES: "Changes or proposals regarding management and reward addresses.",
+    EventGroup.SLASHING_AND_STEALING: "Alerts for validator status and MEV stealing penalties.",
+    EventGroup.WITHDRAWAL_AND_EXIT: "Notifications for exit requests and confirmation of exits.",
+    EventGroup.COMMON_CSM: "",
 }
 
-EVENT_LIST_TEXT = markdown(
-    "Here is the list of events you will receive notifications for:", nl(1),
-    "A 🚨 means urgent action is required from you", nl(),
-    Bold("Key Management Events:"), nl(1), "Changes related to keys and their status.", nl(1),
-    EVENT_DESCRIPTIONS["VettedSigningKeysCountDecreased"], nl(1),
-    EVENT_DESCRIPTIONS["DepositedSigningKeysCountChanged"], nl(1),
-    EVENT_DESCRIPTIONS["TotalSigningKeysCountChanged"], nl(1),
-    EVENT_DESCRIPTIONS["KeyRemovalChargeApplied"], nl(1),
-    EVENT_DESCRIPTIONS["BondCurveSet"], nl(1),
-    EVENT_DESCRIPTIONS["TargetValidatorsCountChanged"], nl(),
-    Bold("Address and Reward Changes:"), nl(1), "Changes or proposals regarding management and reward addresses.",
-    nl(1),
-    EVENT_DESCRIPTIONS["NodeOperatorManagerAddressChangeProposed"], nl(1),
-    EVENT_DESCRIPTIONS["NodeOperatorManagerAddressChanged"], nl(1),
-    EVENT_DESCRIPTIONS["NodeOperatorRewardAddressChangeProposed"], nl(1),
-    EVENT_DESCRIPTIONS["NodeOperatorRewardAddressChanged"], nl(),
-    Bold("Slashing and Stealing Events:"), nl(1), "Alerts for validator status and MEV stealing penalties.", nl(1),
-    EVENT_DESCRIPTIONS["ELRewardsStealingPenaltyReported"], nl(1),
-    EVENT_DESCRIPTIONS["ELRewardsStealingPenaltySettled"], nl(1),
-    EVENT_DESCRIPTIONS["ELRewardsStealingPenaltyCancelled"], nl(),
-    Bold("Withdrawal and Exit Requests:"), nl(1), "Notifications for exit requests and confirmation of exits.", nl(1),
-    EVENT_DESCRIPTIONS["ValidatorExitRequest"], nl(1),
-    EVENT_DESCRIPTIONS["ValidatorExitDelayProcessed"], nl(1),
-    EVENT_DESCRIPTIONS["TriggeredExitFeeRecorded"], nl(1),
-    EVENT_DESCRIPTIONS["StrikesPenaltyProcessed"], nl(1),
-    EVENT_DESCRIPTIONS["WithdrawalSubmitted"], nl(),
-    Bold("Common CSM Events for all the Node Operators:"), nl(1),
-    EVENT_DESCRIPTIONS["DistributionLogUpdated"], nl(1),
-    EVENT_DESCRIPTIONS["Initialized"], nl(1),
-)
+
+EVENT_CATALOG: list[EventDefinition] = [
+    EventDefinition(
+        name="VettedSigningKeysCountDecreased",
+        description="- 🚨 Uploaded invalid keys",
+        group_title=EventGroup.KEY_MANAGEMENT,
+    ),
+    EventDefinition(
+        name="DepositedSigningKeysCountChanged",
+        description="- 🤩 Node Operator's keys received deposits",
+        group_title=EventGroup.KEY_MANAGEMENT,
+    ),
+    EventDefinition(
+        name="TotalSigningKeysCountChanged",
+        description="- 👀 New keys uploaded or removed",
+        group_title=EventGroup.KEY_MANAGEMENT,
+    ),
+    EventDefinition(
+        name="KeyRemovalChargeApplied",
+        description="- 🔑 Applied charge for key removal",
+        group_title=EventGroup.KEY_MANAGEMENT,
+    ),
+    EventDefinition(
+        name="BondCurveSet",
+        description="- ℹ️ Node Operator type changed",
+        group_title=EventGroup.KEY_MANAGEMENT,
+    ),
+    EventDefinition(
+        name="TargetValidatorsCountChanged",
+        description="- 🚨 Target validators count changed",
+        group_title=EventGroup.KEY_MANAGEMENT,
+    ),
+    EventDefinition(
+        name="NodeOperatorManagerAddressChangeProposed",
+        description="- ℹ️ New manager address proposed",
+        group_title=EventGroup.ADDRESS_AND_REWARD_CHANGES,
+    ),
+    EventDefinition(
+        name="NodeOperatorManagerAddressChanged",
+        description="- ✅ Manager address changed",
+        group_title=EventGroup.ADDRESS_AND_REWARD_CHANGES,
+    ),
+    EventDefinition(
+        name="NodeOperatorRewardAddressChangeProposed",
+        description="- ℹ️ New rewards address proposed",
+        group_title=EventGroup.ADDRESS_AND_REWARD_CHANGES,
+    ),
+    EventDefinition(
+        name="NodeOperatorRewardAddressChanged",
+        description="- ✅ Rewards address changed",
+        group_title=EventGroup.ADDRESS_AND_REWARD_CHANGES,
+    ),
+    EventDefinition(
+        name="ELRewardsStealingPenaltyReported",
+        description="- 🚨 Penalty for stealing EL rewards reported",
+        group_title=EventGroup.SLASHING_AND_STEALING,
+    ),
+    EventDefinition(
+        name="ELRewardsStealingPenaltySettled",
+        description="- 🚨 EL rewards stealing penalty confirmed and applied",
+        group_title=EventGroup.SLASHING_AND_STEALING,
+    ),
+    EventDefinition(
+        name="ELRewardsStealingPenaltyCancelled",
+        description="- 😮‍💨 Cancelled penalty for stealing EL rewards",
+        group_title=EventGroup.SLASHING_AND_STEALING,
+    ),
+    EventDefinition(
+        name="ValidatorExitRequest",
+        description="- 🚨 One of the validators requested to exit",
+        group_title=EventGroup.WITHDRAWAL_AND_EXIT,
+    ),
+    EventDefinition(
+        name="ValidatorExitDelayProcessed",
+        description="- 🚨 Exit delay processed; penalty queued for withdrawal",
+        group_title=EventGroup.WITHDRAWAL_AND_EXIT,
+    ),
+    EventDefinition(
+        name="TriggeredExitFeeRecorded",
+        description="- 🚨 Triggered exit fee recorded; penalty will be charged on exit",
+        group_title=EventGroup.WITHDRAWAL_AND_EXIT,
+    ),
+    EventDefinition(
+        name="StrikesPenaltyProcessed",
+        description="- 🚨 Strikes penalty processed; validator exited for poor performance",
+        group_title=EventGroup.WITHDRAWAL_AND_EXIT,
+    ),
+    EventDefinition(
+        name="WithdrawalSubmitted",
+        description="- 👀 Key withdrawal information submitted",
+        group_title=EventGroup.WITHDRAWAL_AND_EXIT,
+    ),
+    EventDefinition(
+        name="DistributionLogUpdated",
+        description="- 📈 New rewards distributed",
+        group_title=EventGroup.COMMON_CSM,
+    ),
+    EventDefinition(
+        name="Initialized",
+        description="- 🎉 CSM v2 launched on mainnet",
+        group_title=EventGroup.COMMON_CSM,
+    ),
+]
+
+EVENT_DESCRIPTIONS = {event.name: event.description for event in EVENT_CATALOG}
+
+
+def _group_event_catalog() -> list[tuple[EventGroup, list[EventDefinition]]]:
+    grouped: dict[EventGroup, list[EventDefinition]] = {}
+    for event in EVENT_CATALOG:
+        grouped.setdefault(event.group_title, []).append(event)
+    return list(grouped.items())
+
+
+def build_event_list_text(allowed_events: set[str], module_ui_url: str | None = None) -> str:
+    _ = module_ui_url
+    parts: list = [
+        "Here is the list of events you will receive notifications for:",
+        nl(1),
+        "A 🚨 means urgent action is required from you",
+        nl(),
+    ]
+
+    for group_title, events in _group_event_catalog():
+        active_events = [event for event in events if event.name in allowed_events]
+        if not active_events:
+            continue
+        parts.extend([Bold(group_title.value), nl(1)])
+        description = GROUP_DESCRIPTIONS.get(group_title, "")
+        if description:
+            parts.extend([description, nl(1)])
+        for event in active_events:
+            parts.extend([event.description, nl(1)])
+        parts.append(nl())
+
+    return markdown(*parts)
+
+
+EVENT_LIST_TEXT = build_event_list_text(set(EVENT_DESCRIPTIONS.keys()))
 
 WELCOME_TEXT = ("Welcome to the CSM Sentinel! " + nl() +
                 "Here you can follow Node Operators and receive notifications about their events." + nl() +
@@ -149,7 +264,7 @@ def bond_curve_set(curve_id: int):
         "ℹ️ ", Bold("Node Operator type changed"), nl(),
         "New type id: ", Code(str(curve_id)), nl(1),
         "Operational requirements may now differ. Check the ",
-        TextLink("CSM UI", url=cfg.csm_ui_url or ""),
+        TextLink("CSM UI", url=cfg.module_ui_url or ""),
         " for updated guidance"
     )
 
@@ -191,7 +306,7 @@ def vetted_signing_keys_count_decreased():
     cfg = get_config()
     return markdown("🚨 ", Bold("Vetted keys count decreased"), nl(),
                     "Consider removing invalid keys. Check ",
-                    TextLink("CSM UI", url=cfg.csm_ui_url or ""), " for more details")
+                    TextLink("CSM UI", url=cfg.module_ui_url or ""), " for more details")
 
 
 @RegisterEventMessage("WithdrawalSubmitted")
@@ -200,7 +315,7 @@ def withdrawal_submitted(key, key_url, amount):
     return markdown("👀 ", Bold("Information about validator withdrawal has been submitted"), nl(),
                     "Withdrawn key: ", TextLink(key, url=key_url),
                     " with exit balance: ", Code(amount), nl(),
-                    "Check the amount of the bond released at ", TextLink("CSM UI", url=cfg.csm_ui_url or ""))
+                    "Check the amount of the bond released at ", TextLink("CSM UI", url=cfg.module_ui_url or ""))
 
 
 @RegisterEventMessage("TotalSigningKeysCountChanged")
@@ -254,7 +369,7 @@ def distribution_data_updated(node_operator_id: int | None=None, striked_validat
     cfg = get_config()
     base_message = Text(
         "📈 ", Bold("Rewards distributed!"), nl(),
-        "Follow the ", TextLink("CSM UI", url=cfg.csm_ui_url or ""),
+        "Follow the ", TextLink("CSM UI", url=cfg.module_ui_url or ""),
         " to check new claimable rewards."
     )
 

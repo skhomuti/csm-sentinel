@@ -7,6 +7,7 @@ from typing import Any
 
 from hexbytes import HexBytes
 from web3 import AsyncHTTPProvider, AsyncWeb3, WebSocketProvider
+from web3.exceptions import TransactionNotFound
 from web3.types import RPCEndpoint, TxParams, TxReceipt
 
 from csm_bot.events import EventMessages
@@ -79,17 +80,22 @@ async def stop_anvil(instance: AnvilInstance) -> None:
 
 
 async def build_subscription(ws_url: str) -> "EventReplayHarness":
+    from csm_bot.config import get_config_async
+    from csm_bot.app.module_adapter import build_module_adapter_from_config
+
     persistent_w3 = AsyncWeb3(WebSocketProvider(ws_url, max_connection_retries=-1))
     w3 = AsyncWeb3(WebSocketProvider(ws_url, max_connection_retries=-1))
-    return EventReplayHarness(persistent_w3, w3)
+    cfg = await get_config_async()
+    module_adapter = build_module_adapter_from_config(cfg, w3)
+    return EventReplayHarness(persistent_w3, w3, module_adapter)
 
 
 class EventReplayHarness(Subscription):
     """Minimal replay helper mirroring subscription entrypoints."""
 
-    def __init__(self, persistent_w3: AsyncWeb3, w3: AsyncWeb3) -> None:
-        super().__init__(persistent_w3)
-        self.event_messages = EventMessages(w3)
+    def __init__(self, persistent_w3: AsyncWeb3, w3: AsyncWeb3, module_adapter) -> None:
+        super().__init__(persistent_w3, module_adapter.allowed_events())
+        self.event_messages = EventMessages(w3, module_adapter)
         self.processed_events: list[tuple[Event, str]] = []
 
     async def process_event_log(self, event: Event):
@@ -131,7 +137,13 @@ async def replay_transaction_on_anvil(
         provider = fork_w3.provider
         if isinstance(provider, WebSocketProvider) and not await provider.is_connected():
             await provider.connect()
-        tx = await fork_w3.eth.get_transaction(target_hash)
+        try:
+            tx = await fork_w3.eth.get_transaction(target_hash)
+        except TransactionNotFound as exc:
+            import pytest
+
+            pytest.skip(f"Transaction not found in fork provider: {tx_hash}")
+            raise exc
     finally:
         provider = fork_w3.provider
         if isinstance(provider, WebSocketProvider):

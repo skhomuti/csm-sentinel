@@ -8,22 +8,6 @@ import pytest
 from csm_bot.config import clear_config
 
 
-async def _fake_addresses():
-    from csm_bot.app.contracts import ContractAddresses
-
-    return ContractAddresses(
-        csm="0x000000000000000000000000000000000000c5m0",
-        accounting="0x000000000000000000000000000000000000aacc",
-        parameters_registry="0x000000000000000000000000000000000000prm5",
-        fee_distributor="0x000000000000000000000000000000000000feed",
-        exit_penalties="0x000000000000000000000000000000000000b1d0",
-        lido_locator="0x0000000000000000000000000000000000001d0c",
-        staking_router="0x00000000000000000000000000000000000057a0",
-        vebo="0x000000000000000000000000000000000000veb0",
-        csm_staking_module_id=3,
-    )
-
-
 def test_event_readable_string():
     from src.csm_bot.models import Event
 
@@ -109,14 +93,12 @@ def test_texts_manager_address_change_proposed_messages():
         "PROCESS_BLOCKS_REQUESTS_PER_SECOND": "3.5",
         "BLOCK_FROM": "789",
         "WEB3_SOCKET_PROVIDER": "wss://example.invalid",
-        "CSM_ADDRESS": "0x000000000000000000000000000000000000c5m0",
+        "CSM_ADDRESS": "0x0000000000000000000000000000000000000001",
     },
     clear=True,
 )
-def test_config_parsing_and_templates(monkeypatch):
+def test_config_parsing_and_templates(monkeypatch, stub_discover_contract_addresses):
     from csm_bot.config import get_config
-
-    monkeypatch.setattr("csm_bot.config._discover_contract_addresses", lambda *_: _fake_addresses())
 
     clear_config()
     cfg = get_config()
@@ -136,23 +118,23 @@ def test_config_parsing_and_templates(monkeypatch):
     os.environ,
     {
         "WEB3_SOCKET_PROVIDER": "wss://example.invalid",
-        "CSM_ADDRESS": "0x000000000000000000000000000000000000c5m0",
+        "CSM_ADDRESS": "0x0000000000000000000000000000000000000001",
         "PROCESS_BLOCKS_REQUESTS_PER_SECOND": "2",
     },
     clear=True,
 )
-async def test_process_blocks_rate_limit(monkeypatch):
+async def test_process_blocks_rate_limit(monkeypatch, stub_discover_contract_addresses):
     from csm_bot.config import get_config_async
     from csm_bot.rpc import Subscription
-
-    monkeypatch.setattr("csm_bot.config._discover_contract_addresses", lambda *_: _fake_addresses())
 
     class DummyW3:
         provider = None
 
     clear_config()
     await get_config_async()
-    subscription = Subscription(DummyW3())
+    from csm_bot.texts import EVENT_DESCRIPTIONS
+
+    subscription = Subscription(DummyW3(), set(EVENT_DESCRIPTIONS.keys()))
     try:
         start = asyncio.get_running_loop().time()
         await subscription._throttle_process_blocks_request()

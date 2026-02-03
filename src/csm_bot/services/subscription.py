@@ -19,8 +19,8 @@ if TYPE_CHECKING:
 class TelegramSubscription(Subscription):
     """Bridge Web3 subscription events into the Telegram application update queue."""
 
-    def __init__(self, w3, application: Application, event_messages) -> None:
-        super().__init__(w3)
+    def __init__(self, w3, application: Application, event_messages, allowed_events: set[str]) -> None:
+        super().__init__(w3, allowed_events)
         self.application = application
         self.event_messages = event_messages
 

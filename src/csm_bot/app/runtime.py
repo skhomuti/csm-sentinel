@@ -8,10 +8,11 @@ if TYPE_CHECKING:
 
     from csm_bot.events import EventMessages
     from csm_bot.jobs import JobContext
+    from csm_bot.app.module_adapter import ModuleAdapter
     from csm_bot.services.subscription import TelegramSubscription
 
 
-_RUNTIME_ATTR = "_csm_runtime"
+_RUNTIME_ATTR = "_module_runtime"
 
 
 @dataclass(slots=True)
@@ -23,6 +24,7 @@ class BotRuntime:
     subscription: "TelegramSubscription"
     event_messages: "EventMessages"
     job_context: "JobContext"
+    module_adapter: "ModuleAdapter"
 
 
 def attach_runtime(runtime: BotRuntime) -> None:

@@ -1,8 +1,9 @@
 import asyncio
 import datetime
 import logging
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import aiohttp
 from eth_utils import humanize_wei
@@ -11,10 +12,7 @@ from async_lru import alru_cache
 
 from csm_bot.models import (
     Event,
-    ACCOUNTING_ABI,
     EventHandler,
-    CSM_ABI,
-    PARAMETERS_REGISTRY_ABI,
 )
 from csm_bot.texts import (
     EVENT_MESSAGES,
@@ -24,10 +22,15 @@ from csm_bot.texts import (
 )
 from csm_bot.config import get_config
 
+if TYPE_CHECKING:
+    from csm_bot.app.module_adapter import ModuleAdapter
+
 # This is a dictionary that will be populated with the events to follow
 EVENTS_TO_FOLLOW: dict[str, EventHandler] = {}
 
 logger = logging.getLogger(__name__)
+
+DistributionLogFetcher = Callable[[str], Awaitable[dict | list]]
 
 
 @dataclass
@@ -89,26 +92,27 @@ class RegisterEvent:
 
 
 class EventMessages:
-    def __init__(self, w3: AsyncWeb3):
+    def __init__(
+        self,
+        w3: AsyncWeb3,
+        module_adapter: "ModuleAdapter",
+        distribution_log_fetcher: "DistributionLogFetcher | None" = None,
+    ):
         self.connectProvider = ConnectOnDemand(w3)
         self.w3 = w3
+        self.module_adapter = module_adapter
+        self._distribution_log_fetcher = distribution_log_fetcher or self._default_distribution_log_fetcher
 
         # Config snapshot
         self.cfg = get_config()
-        self.csm_address = self.cfg.csm_address
-        self.accounting_address = self.cfg.accounting_address
-        self.parameters_registry_address = self.cfg.parameters_registry_address
+        self.module_address = module_adapter.addresses.module
+        self.accounting_address = module_adapter.addresses.accounting
+        self.parameters_registry_address = module_adapter.addresses.parameters_registry
 
-        # Contracts (single ABI version supported)
-        self.csm = self.w3.eth.contract(address=self.csm_address, abi=CSM_ABI, decode_tuples=True)
-
-        self.accounting = self.w3.eth.contract(address=self.accounting_address, abi=ACCOUNTING_ABI, decode_tuples=True)
-
-        self.parametersRegistry = self.w3.eth.contract(
-            address=self.parameters_registry_address,
-            abi=PARAMETERS_REGISTRY_ABI,
-            decode_tuples=True,
-        )
+        # Contracts (module-specific adapter)
+        self.module = module_adapter.contracts.module
+        self.accounting = module_adapter.contracts.accounting
+        self.parametersRegistry = module_adapter.contracts.parameters_registry
 
     @alru_cache(maxsize=3)
     async def _fetch_distribution_log(self, log_cid: str):
@@ -117,6 +121,9 @@ class EventMessages:
         if not log_cid:
             raise ValueError("log_cid must be provided")
 
+        return await self._distribution_log_fetcher(log_cid)
+
+    async def _default_distribution_log_fetcher(self, log_cid: str):
         ipfs_url = f"https://ipfs.io/ipfs/{log_cid}"
         timeout = aiohttp.ClientTimeout(total=30)
         async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -136,13 +143,17 @@ class EventMessages:
         return NotificationPlan(broadcast=EVENT_EMITS.format(event.event, event.args))
 
     async def get_notification_plan(self, event: Event):
-        event_handler = EVENTS_TO_FOLLOW.get(event.event)
-        if event_handler is not None:
-            handler = event_handler.handler
-        else:
-            handler = self.default
+        if event.event not in self.module_adapter.allowed_events():
+            return None
         async with self.connectProvider:
-            result: NotificationPlan | str = await handler(self, event)
+            result = await self.module_adapter.event_enricher(event, self)
+            if result is None:
+                event_handler = EVENTS_TO_FOLLOW.get(event.event)
+                if event_handler is not None:
+                    handler = event_handler.handler
+                else:
+                    handler = self.default
+                result = await handler(self, event)
 
         if result is None:
             return None
@@ -251,7 +262,7 @@ class EventMessages:
         # TODO add exit penalties applied
         template: callable = EVENT_MESSAGES.get(event.event)
         key = self.w3.to_hex(
-            await self.csm.functions
+            await self.module.functions
             .getSigningKeys(event.args["nodeOperatorId"], event.args['keyIndex'], 1)
             .call(block_identifier=event.block)
         )
@@ -262,7 +273,7 @@ class EventMessages:
     @RegisterEvent('TotalSigningKeysCountChanged')
     async def total_signing_keys_count_changed(self, event: Event):
         template: callable = EVENT_MESSAGES.get(event.event)
-        node_operator = await self.csm.functions.getNodeOperator(event.args["nodeOperatorId"]).call(
+        node_operator = await self.module.functions.getNodeOperator(event.args["nodeOperatorId"]).call(
             block_identifier=event.block - 1
         )
         return template(event.args['totalKeysCount'], node_operator.totalAddedKeys) + self.footer(event)
@@ -362,7 +373,7 @@ class EventMessages:
 
     @RegisterEvent("TargetValidatorsCountChanged")
     async def target_validators_count_changed(self, event: Event):
-        node_operator = await self.csm.functions.getNodeOperator(event.args["nodeOperatorId"]).call(
+        node_operator = await self.module.functions.getNodeOperator(event.args["nodeOperatorId"]).call(
             block_identifier=event.block - 1
         )
         mode_before = node_operator.targetLimitMode
@@ -377,6 +388,6 @@ class EventMessages:
         if event.args['version'] != 2:
             return None
         # Normalize address comparison to avoid case-sensitivity issues
-        if event.address.lower() != self.csm_address.lower():
+        if event.address.lower() != self.module_address.lower():
             return None
         return template() + self.footer(event)

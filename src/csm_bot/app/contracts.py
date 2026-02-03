@@ -4,7 +4,8 @@ from dataclasses import dataclass
 
 from web3 import WebSocketProvider, AsyncWeb3, AsyncHTTPProvider
 
-from csm_bot.models import CSM_ABI, LIDO_LOCATOR_ABI, STAKING_ROUTER_ABI
+from csm_bot.models import MODULE_ABI, LIDO_LOCATOR_ABI, STAKING_ROUTER_ABI
+from csm_bot.module_types import ModuleType, decode_module_type
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 @dataclass(frozen=True, slots=True)
 class ContractAddresses:
-    csm: str
+    module: str
     accounting: str
     parameters_registry: str
     fee_distributor: str
@@ -21,11 +22,12 @@ class ContractAddresses:
     lido_locator: str
     staking_router: str
     vebo: str
-    csm_staking_module_id: int
+    staking_module_id: int
+    module_type: ModuleType
 
     def as_dict(self) -> dict[str, str | int]:
         return {
-            "csm": self.csm,
+            "module": self.module,
             "accounting": self.accounting,
             "parameters_registry": self.parameters_registry,
             "fee_distributor": self.fee_distributor,
@@ -33,24 +35,28 @@ class ContractAddresses:
             "lido_locator": self.lido_locator,
             "staking_router": self.staking_router,
             "vebo": self.vebo,
-            "csm_staking_module_id": self.csm_staking_module_id,
+            "staking_module_id": self.staking_module_id,
+            "module_type": self.module_type.value,
         }
 
 
-async def discover_contract_addresses(w3: AsyncWeb3, csm_address: str) -> ContractAddresses:
+async def discover_contract_addresses(w3: AsyncWeb3, module_address: str) -> ContractAddresses:
     """Asynchronously discover dependent contract addresses using the provided provider."""
 
     if not await w3.is_connected():
         await w3.provider.connect()
 
     checksum = w3.to_checksum_address
-    csm = w3.eth.contract(address=checksum(csm_address), abi=CSM_ABI, decode_tuples=True)
+    module_contract = w3.eth.contract(address=checksum(module_address), abi=MODULE_ABI, decode_tuples=True)
 
-    accounting = await csm.functions.ACCOUNTING().call()
-    parameters_registry = await csm.functions.PARAMETERS_REGISTRY().call()
-    fee_distributor = await csm.functions.FEE_DISTRIBUTOR().call()
-    exit_penalties = await csm.functions.EXIT_PENALTIES().call()
-    lido_locator = await csm.functions.LIDO_LOCATOR().call()
+    module_type_raw = await module_contract.functions.getType().call()
+    module_type = decode_module_type(module_type_raw)
+
+    accounting = await module_contract.functions.ACCOUNTING().call()
+    parameters_registry = await module_contract.functions.PARAMETERS_REGISTRY().call()
+    fee_distributor = await module_contract.functions.FEE_DISTRIBUTOR().call()
+    exit_penalties = await module_contract.functions.EXIT_PENALTIES().call()
+    lido_locator = await module_contract.functions.LIDO_LOCATOR().call()
 
     locator = w3.eth.contract(address=checksum(_ensure_address(lido_locator, "LIDO_LOCATOR")), abi=LIDO_LOCATOR_ABI)
     vebo = await locator.functions.validatorsExitBusOracle().call()
@@ -62,10 +68,10 @@ async def discover_contract_addresses(w3: AsyncWeb3, csm_address: str) -> Contra
     )
     modules = await staking_router_contract.functions.getStakingModules().call()
 
-    module_id = _find_staking_module_id(modules, checksum(csm_address))
+    module_id = _find_staking_module_id(modules, checksum(module_address))
 
     addresses = ContractAddresses(
-        csm=checksum(_ensure_address(csm_address, "CSM_ADDRESS")),
+        module=checksum(_ensure_address(module_address, "MODULE_ADDRESS")),
         accounting=checksum(_ensure_address(accounting, "ACCOUNTING()")),
         parameters_registry=checksum(_ensure_address(parameters_registry, "PARAMETERS_REGISTRY()")),
         fee_distributor=checksum(_ensure_address(fee_distributor, "FEE_DISTRIBUTOR()")),
@@ -73,16 +79,17 @@ async def discover_contract_addresses(w3: AsyncWeb3, csm_address: str) -> Contra
         lido_locator=checksum(_ensure_address(lido_locator, "LIDO_LOCATOR()")),
         staking_router=checksum(_ensure_address(staking_router, "stakingRouter()")),
         vebo=checksum(_ensure_address(vebo, "validatorsExitBusOracle()")),
-        csm_staking_module_id=module_id,
+        staking_module_id=module_id,
+        module_type=module_type,
     )
 
     _log_discovered_addresses(addresses)
     return addresses
 
 
-async def discover_contract_addresses_from_url(provider_url: str, csm_address: str) -> ContractAddresses:
+async def discover_contract_addresses_from_url(provider_url: str, module_address: str) -> ContractAddresses:
     w3 = await _build_web3(provider_url)
-    return await discover_contract_addresses(w3, csm_address)
+    return await discover_contract_addresses(w3, module_address)
 
 
 def _ensure_address(raw_address: str, source: str) -> str:
@@ -91,13 +98,13 @@ def _ensure_address(raw_address: str, source: str) -> str:
     return raw_address
 
 
-def _find_staking_module_id(modules: list[tuple], csm_address: str) -> int:
+def _find_staking_module_id(modules: list[tuple], module_address: str) -> int:
     for module in modules:
         # getStakingModules returns tuple entries with well known layout
-        module_id, module_address = module[0], module[1]
-        if module_address.lower() == csm_address.lower():
+        module_id, staking_module_address = module[0], module[1]
+        if staking_module_address.lower() == module_address.lower():
             return int(module_id)
-    raise RuntimeError("Failed to resolve CSM staking module ID from staking router modules")
+    raise RuntimeError("Failed to resolve staking module ID from staking router modules")
 
 
 def _log_discovered_addresses(addresses: ContractAddresses) -> None:
