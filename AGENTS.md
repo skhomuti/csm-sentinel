@@ -16,6 +16,10 @@ These are the core guidelines for working in this repository.
 
 ## Build, Test, and Dev Commands
 - Test: `uv run pytest -q` (or `./.venv/bin/pytest -q` if `uv` cannot access its cache)
+- Linters: install with `uv add --dev ruff ty` (updates `uv.lock`)
+- Lint: `uv run ruff check .`
+- Format: `uv run ruff format .`
+- Typecheck: `uv run ty check`
 - Run locally: `uv run python src/csm_bot/main.py` (requires `.env`).
 - Docker: `docker compose up -d` (or `docker compose -f docker-compose-ethd.yml up -d` when co-running with eth-docker).
 

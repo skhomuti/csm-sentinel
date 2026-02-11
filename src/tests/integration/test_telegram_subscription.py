@@ -39,7 +39,7 @@ async def _exercise_event(
     fork_block = fork_block if not via_subscription else fork_block - 1
 
     anvil = await anvil_launcher(fork_block)
-    harness = await build_subscription(anvil.ws_url)
+    harness = await build_subscription(anvil.ws_url, anvil.http_url)
     subscription_task: asyncio.Task | None = None
     try:
         if via_subscription:

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class BotContext(ContextTypes.DEFAULT_TYPE):
     """Extend the default context with shortcuts for runtime and bot/chat storage."""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._runtime: BotRuntime | None = None
         self._bot_storage: BotStorage | None = None

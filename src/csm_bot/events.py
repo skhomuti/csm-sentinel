@@ -31,6 +31,7 @@ EVENTS_TO_FOLLOW: dict[str, EventHandler] = {}
 logger = logging.getLogger(__name__)
 
 DistributionLogFetcher = Callable[[str], Awaitable[dict | list]]
+MessageTemplate = Callable[..., str]
 
 
 @dataclass
@@ -150,10 +151,9 @@ class EventMessages:
             if result is None:
                 event_handler = EVENTS_TO_FOLLOW.get(event.event)
                 if event_handler is not None:
-                    handler = event_handler.handler
+                    result = await event_handler.handler(self, event)
                 else:
-                    handler = self.default
-                result = await handler(self, event)
+                    result = await self.default(event)
 
         if result is None:
             return None
@@ -182,14 +182,21 @@ class EventMessages:
             raise RuntimeError(f"{env_var} must be configured")
         return template
 
+    @staticmethod
+    def _require_message_template(event_name: str) -> MessageTemplate:
+        template = EVENT_MESSAGES.get(event_name)
+        if template is None:
+            raise RuntimeError(f"Missing message template for event {event_name}")
+        return template
+
     @RegisterEvent('DepositedSigningKeysCountChanged')
     async def deposited_signing_keys_count_changed(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         return template(event.args['depositedKeysCount']) + self.footer(event)
 
     @RegisterEvent('ELRewardsStealingPenaltyCancelled')
     async def el_rewards_stealing_penalty_cancelled(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         remaining_amount = humanize_wei(
             await self.accounting.functions
             .getActualLockedBond(event.args['nodeOperatorId'])
@@ -199,7 +206,7 @@ class EventMessages:
 
     @RegisterEvent('ELRewardsStealingPenaltyReported')
     async def el_rewards_stealing_penalty_reported(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         block_hash = self.w3.to_hex(event.args['proposedBlockHash'])
         block_template = self._require_template(self.cfg.etherscan_block_url_template, "ETHERSCAN_URL")
         block_link = block_template.format(block_hash)
@@ -207,7 +214,7 @@ class EventMessages:
 
     @RegisterEvent('ELRewardsStealingPenaltySettled')
     async def el_rewards_stealing_penalty_settled(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         logs = await self.accounting.events.BondBurned().get_logs(from_block=event.block, to_block=event.block)
         burnt_event = next(filter(lambda x: x.args['nodeOperatorId'] == event.args['nodeOperatorId'], logs), None)
         if burnt_event:
@@ -218,12 +225,12 @@ class EventMessages:
 
     @RegisterEvent('BondCurveSet')
     async def bond_curve_set(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         return template(event.args['curveId']) + self.footer(event)
 
     @RegisterEvent('KeyRemovalChargeApplied')
     async def key_removal_charge_applied(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         curve_id = await self.accounting.functions.getBondCurveId(event.args['nodeOperatorId']).call(
             block_identifier=event.block
         )
@@ -234,33 +241,33 @@ class EventMessages:
 
     @RegisterEvent('NodeOperatorManagerAddressChangeProposed')
     async def node_operator_manager_address_change_proposed(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         return template(event.args['newProposedAddress']) + self.footer(event)
 
     @RegisterEvent('NodeOperatorManagerAddressChanged')
     async def node_operator_manager_address_changed(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         return template(event.args['newAddress']) + self.footer(event)
 
     @RegisterEvent('NodeOperatorRewardAddressChangeProposed')
     async def node_operator_reward_address_change_proposed(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         return template(event.args['newProposedAddress']) + self.footer(event)
 
     @RegisterEvent('NodeOperatorRewardAddressChanged')
     async def node_operator_reward_address_changed(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         return template(event.args['newAddress']) + self.footer(event)
 
     @RegisterEvent('VettedSigningKeysCountDecreased')
     async def vetted_signing_keys_count_decreased(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         return template() + self.footer(event)
 
     @RegisterEvent('WithdrawalSubmitted')
     async def withdrawal_submitted(self, event: Event):
         # TODO add exit penalties applied
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         key = self.w3.to_hex(
             await self.module.functions
             .getSigningKeys(event.args["nodeOperatorId"], event.args['keyIndex'], 1)
@@ -272,7 +279,7 @@ class EventMessages:
 
     @RegisterEvent('TotalSigningKeysCountChanged')
     async def total_signing_keys_count_changed(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         node_operator = await self.module.functions.getNodeOperator(event.args["nodeOperatorId"]).call(
             block_identifier=event.block - 1
         )
@@ -280,7 +287,7 @@ class EventMessages:
 
     @RegisterEvent('ValidatorExitRequest')
     async def validator_exit_request(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         key = self.w3.to_hex(event.args['validatorPubkey'])
         beacon_template = self._require_template(self.cfg.beaconchain_url_template, "BEACONCHAIN_URL")
         key_url = beacon_template.format(key)
@@ -290,7 +297,7 @@ class EventMessages:
 
     @RegisterEvent('ValidatorExitDelayProcessed')
     async def validator_exit_delay_processed(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         key = self.w3.to_hex(event.args['pubkey'])
         beacon_template = self._require_template(self.cfg.beaconchain_url_template, "BEACONCHAIN_URL")
         key_url = beacon_template.format(key)
@@ -299,7 +306,7 @@ class EventMessages:
 
     @RegisterEvent('TriggeredExitFeeRecorded')
     async def triggered_exit_fee_recorded(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         key = self.w3.to_hex(event.args['pubkey'])
         beacon_template = self._require_template(self.cfg.beaconchain_url_template, "BEACONCHAIN_URL")
         key_url = beacon_template.format(key)
@@ -309,7 +316,7 @@ class EventMessages:
 
     @RegisterEvent('StrikesPenaltyProcessed')
     async def strikes_penalty_processed(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         key = self.w3.to_hex(event.args['pubkey'])
         beacon_template = self._require_template(self.cfg.beaconchain_url_template, "BEACONCHAIN_URL")
         key_url = beacon_template.format(key)
@@ -318,7 +325,7 @@ class EventMessages:
 
     @RegisterEvent("DistributionLogUpdated")
     async def distribution_log_updated(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         base_message = template()
         footer = self.footer(event)
 
@@ -379,12 +386,20 @@ class EventMessages:
         mode_before = node_operator.targetLimitMode
         limit_before = node_operator.targetLimit
 
-        template: callable = EVENT_MESSAGES.get(event.event)
-        return template(mode_before, limit_before, event.args['targetLimitMode'], event.args['targetValidatorsCount']) + self.footer(event)
+        template = self._require_message_template(event.event)
+        return (
+            template(
+                mode_before,
+                limit_before,
+                event.args['targetLimitMode'],
+                event.args['targetValidatorsCount'],
+            )
+            + self.footer(event)
+        )
 
     @RegisterEvent("Initialized")
     async def initialized(self, event: Event):
-        template: callable = EVENT_MESSAGES.get(event.event)
+        template = self._require_message_template(event.event)
         if event.args['version'] != 2:
             return None
         # Normalize address comparison to avoid case-sensitivity issues

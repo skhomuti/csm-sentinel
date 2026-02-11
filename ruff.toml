@@ -1,0 +1,7 @@
+target-version = "py311"
+line-length = 100
+src = ["src"]
+
+[lint]
+# Start small; expand rule sets once the baseline is clean.
+select = ["E4", "E7", "E9", "F"]

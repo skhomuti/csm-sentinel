@@ -19,8 +19,9 @@ if TYPE_CHECKING:
 @admin_only(failure_state=States.WELCOME)
 async def admin_menu(update: Update, context: "BotContext") -> States:
     query = update.callback_query
-    if query is not None:
-        await query.answer()
+    if query is None:
+        return States.ADMIN
+    await query.answer()
     keyboard = [
         [InlineKeyboardButton(ADMIN_BUTTON_SUBSCRIPTIONS, callback_data=Callback.ADMIN_SUBSCRIPTIONS.value)],
         [InlineKeyboardButton(ADMIN_BUTTON_BROADCAST, callback_data=Callback.ADMIN_BROADCAST.value)],
@@ -35,6 +36,11 @@ async def subscriptions(update: Update, context: "BotContext"):
     query = update.callback_query
     if query is not None:
         await query.answer()
+
+    chat = update.effective_chat
+    if chat is None:
+        return States.ADMIN if query is not None else States.WELCOME
+    chat_id = chat.id
 
     counts = get_active_subscription_counts(context.bot_storage)
 
@@ -64,7 +70,6 @@ async def subscriptions(update: Update, context: "BotContext"):
     back_keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(BUTTON_BACK, callback_data=Callback.BACK.value)]])
 
     if query is not None:
-        chat_id = query.message.chat_id if query.message else update.effective_chat.id
         if len(chunks) == 1:
             await query.edit_message_text(text=chunks[0], reply_markup=back_keyboard)
         else:
@@ -74,7 +79,6 @@ async def subscriptions(update: Update, context: "BotContext"):
             await context.bot.send_message(chat_id=chat_id, text=chunks[-1], reply_markup=back_keyboard)
         return States.ADMIN
 
-    chat_id = update.effective_chat.id
     if len(chunks) == 1:
         await context.bot.send_message(chat_id=chat_id, text=chunks[0], reply_markup=back_keyboard)
     else:

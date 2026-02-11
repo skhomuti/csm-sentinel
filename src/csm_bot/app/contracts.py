@@ -2,6 +2,7 @@ import logging
 import json
 from dataclasses import dataclass
 
+from eth_typing import ChecksumAddress
 from web3 import WebSocketProvider, AsyncWeb3, AsyncHTTPProvider
 
 from csm_bot.models import MODULE_ABI, LIDO_LOCATOR_ABI, STAKING_ROUTER_ABI
@@ -14,14 +15,14 @@ ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 @dataclass(frozen=True, slots=True)
 class ContractAddresses:
-    module: str
-    accounting: str
-    parameters_registry: str
-    fee_distributor: str
-    exit_penalties: str
-    lido_locator: str
-    staking_router: str
-    vebo: str
+    module: ChecksumAddress
+    accounting: ChecksumAddress
+    parameters_registry: ChecksumAddress
+    fee_distributor: ChecksumAddress
+    exit_penalties: ChecksumAddress
+    lido_locator: ChecksumAddress
+    staking_router: ChecksumAddress
+    vebo: ChecksumAddress
     staking_module_id: int
     module_type: ModuleType
 

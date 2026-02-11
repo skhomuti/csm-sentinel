@@ -3,6 +3,8 @@ import logging
 import os
 from dataclasses import dataclass
 
+from eth_typing import ChecksumAddress
+
 from csm_bot.module_types import ModuleType
 
 logger = logging.getLogger(__name__)
@@ -29,14 +31,14 @@ class Config:
     web3_socket_provider: str
 
     # Addresses and IDs
-    module_address: str
-    accounting_address: str
-    parameters_registry_address: str
-    vebo_address: str
-    fee_distributor_address: str
-    exit_penalties_address: str
-    lido_locator_address: str
-    staking_router_address: str
+    module_address: ChecksumAddress
+    accounting_address: ChecksumAddress
+    parameters_registry_address: ChecksumAddress
+    vebo_address: ChecksumAddress
+    fee_distributor_address: ChecksumAddress
+    exit_penalties_address: ChecksumAddress
+    lido_locator_address: ChecksumAddress
+    staking_router_address: ChecksumAddress
     staking_module_id: int
     module_type: ModuleType
 
@@ -106,6 +108,9 @@ async def _build_config_from_env() -> Config:
         logger.warning("CSM_UI_URL is deprecated; use MODULE_UI_URL instead.")
     module_ui_url = raw_module_ui_url or raw_csm_ui_url
 
+    raw_block_from = os.getenv("BLOCK_FROM")
+    block_from = int(raw_block_from) if raw_block_from else None
+
     return Config(
         filestorage_path=filestorage_path,
         token=token,
@@ -125,7 +130,7 @@ async def _build_config_from_env() -> Config:
         module_ui_url=module_ui_url,
         block_batch_size=int(os.getenv("BLOCK_BATCH_SIZE", 10_000)),
         process_blocks_requests_per_second=process_blocks_requests_per_second,
-        block_from=(int(os.getenv("BLOCK_FROM")) if os.getenv("BLOCK_FROM") else None),
+        block_from=block_from,
         admin_ids=_parse_admin_ids(os.getenv("ADMIN_IDS", "")),
     )
 

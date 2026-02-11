@@ -45,7 +45,7 @@ def normalise_node_operator_map(mapping: Any) -> Dict[str, Set[int]]:
         return {}
 
     try:
-        items = mapping.items()  # type: ignore[attr-defined]
+        items = mapping.items()
     except AttributeError:  # pragma: no cover - defensive
         logger.warning("Ignoring malformed node operator mapping: %r", mapping)
         return {}
@@ -109,6 +109,22 @@ class ChatIdSet:
 
     def all(self) -> Set[int]:
         return set(self._values)
+
+    def migrate_chat_id(self, old_chat_id: int, new_chat_id: int) -> bool:
+        """Replace an existing chat id with a new one.
+
+        Returns True when the set was updated.
+        """
+
+        old_id = int(old_chat_id)
+        new_id = int(new_chat_id)
+        if old_id == new_id:
+            return False
+        if old_id not in self._values:
+            return False
+        self._values.discard(old_id)
+        self._values.add(new_id)
+        return True
 
     @property
     def _values(self) -> Set[int]:
@@ -182,6 +198,25 @@ class NodeOperatorChats:
             }
         return results
 
+    def migrate_chat_id(self, old_chat_id: int, new_chat_id: int) -> int:
+        """Replace an existing chat id with a new one across all node operators.
+
+        Returns the number of node operators whose chat set was updated.
+        """
+
+        old_id = int(old_chat_id)
+        new_id = int(new_chat_id)
+        if old_id == new_id:
+            return 0
+
+        updated = 0
+        for chats in self._mapping.values():
+            if old_id in chats:
+                chats.discard(old_id)
+                chats.add(new_id)
+                updated += 1
+        return updated
+
     @property
     def _mapping(self) -> Dict[str, Set[int]]:
         return self._bot_data[self._key]
@@ -235,6 +270,14 @@ class BotStorage:
             self.groups.all(),
             self.channels.all(),
         )
+
+    def migrate_chat_id(self, old_chat_id: int, new_chat_id: int) -> None:
+        """Update stored indexes for a migrated chat id."""
+
+        self.users.migrate_chat_id(old_chat_id, new_chat_id)
+        self.groups.migrate_chat_id(old_chat_id, new_chat_id)
+        self.channels.migrate_chat_id(old_chat_id, new_chat_id)
+        self.node_operator_chats.migrate_chat_id(old_chat_id, new_chat_id)
 
 
 class NodeOperatorSubscriptions:

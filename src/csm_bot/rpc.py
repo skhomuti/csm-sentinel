@@ -4,6 +4,7 @@ import os
 
 import signal
 from asyncio import BaseEventLoop
+from typing import Any, cast
 
 import web3.exceptions
 from web3 import AsyncWeb3, WebSocketProvider
@@ -17,7 +18,7 @@ from web3.types import EventData, FilterParams
 from websockets import ConnectionClosed
 
 from csm_bot.utils import normalize_block_number
-from csm_bot.config import get_config
+from csm_bot.config import Config, get_config
 from csm_bot.texts import EVENT_DESCRIPTIONS
 from csm_bot.models import (
     Event,
@@ -42,10 +43,18 @@ def topics_to_follow(allowed_events: set[str], *abis) -> dict:
 
 
 class Subscription:
-    def __init__(self, w3: AsyncWeb3, allowed_events: set[str]):
+    def __init__(
+        self,
+        w3: AsyncWeb3,
+        allowed_events: set[str],
+        *,
+        backfill_w3: AsyncWeb3 | None = None,
+    ):
         super().__init__()
         self._shutdown_event = asyncio.Event()
+        self._subscriptions_started = asyncio.Event()
         self._w3 = w3
+        self._backfill_w3 = backfill_w3 or w3
         self.abi_by_topics = topics_to_follow(
             allowed_events,
             MODULE_ABI,
@@ -54,10 +63,35 @@ class Subscription:
             VEBO_ABI,
             EXIT_PENALTIES_ABI,
         )
-        self.cfg = get_config()
+        self.cfg: Config = get_config()
         rps_limit = self.cfg.process_blocks_requests_per_second
         self._process_blocks_request_interval = (1 / rps_limit) if rps_limit else None
         self._last_process_blocks_request_ts: float | None = None
+
+    def start_catchup(self, until_block: int) -> None:
+        """Hook for subclasses to prepare for catch-up/backfill mode.
+
+        The base implementation is a no-op.
+        """
+
+        _ = until_block
+
+    def finish_catchup(self) -> None:
+        """Hook for subclasses to finish catch-up/backfill mode.
+
+        The base implementation is a no-op.
+        """
+
+    async def wait_until_subscribed(self, *, timeout: float = 10.0) -> None:
+        """Wait until subscriptions are established (or raise on timeout)."""
+
+        await asyncio.wait_for(self._subscriptions_started.wait(), timeout=timeout)
+
+    async def get_block_number(self) -> int:
+        """Return the latest block number from the provider."""
+
+        w3 = await anext(self.backfill_w3)
+        return await w3.eth.get_block_number()
 
     @property
     async def w3(self):
@@ -65,6 +99,13 @@ class Subscription:
             await self._w3.provider.connect()
             logger.info("Web3 provider connected")
         yield self._w3
+
+    @property
+    async def backfill_w3(self):
+        if not await self._backfill_w3.provider.is_connected():
+            await self._backfill_w3.provider.connect()
+            logger.info("Web3 backfill provider connected")
+        yield self._backfill_w3
 
     def setup_signal_handlers(self, loop):
         loop.add_signal_handler(signal.SIGINT, self._signal_handler, loop)
@@ -96,6 +137,11 @@ class Subscription:
 
     async def shutdown(self):
         await self._shutdown_event.wait()
+
+    def request_shutdown(self) -> None:
+        """Trigger shutdown (e.g., from a supervising task)."""
+
+        self._shutdown_event.set()
 
     @staticmethod
     def _filter_vebo_exit_requests(event: Event):
@@ -137,6 +183,7 @@ class Subscription:
             subs_heads = NewHeadsSubscription(handler=self._handle_new_block_subscription)
             await w3.subscription_manager.subscribe([subs_module, subs_acc, subs_vebo, subs_fd, subs_ep, subs_heads])
             logger.info("Subscriptions started")
+            self._subscriptions_started.set()
 
             await w3.subscription_manager.handle_subscriptions()
 
@@ -145,9 +192,9 @@ class Subscription:
 
 
     async def process_blocks_from(self, start_block: int, end_block: int | None = None):
-        w3 = await anext(self.w3)
+        w3 = await anext(self.backfill_w3)
         end_block = end_block or await w3.eth.get_block_number()
-        if start_block == end_block:
+        if start_block >= end_block:
             logger.info("No blocks to process")
             return
         logger.info("Processing blocks from %s to %s", start_block, end_block)
@@ -221,14 +268,16 @@ class Subscription:
 
     async def _handle_new_block_subscription(self, context: NewHeadsSubscriptionContext):
         num = context.result["number"]
-        await self.process_new_block(Block(number=normalize_block_number(num)))
+        await self.process_new_block_from_subscription(Block(number=normalize_block_number(num)))
 
     async def _handle_event_log_subscription(self, context: LogsSubscriptionContext):
-        event_topic = context.result["topics"][0]
+        # web3 stubs type `context.result` too broadly; treat as a log receipt-like mapping.
+        result = cast(dict[str, Any], context.result)
+        event_topic = result["topics"][0]
         event_abi = self.abi_by_topics.get(event_topic)
         if not event_abi:
             return
-        event_data: EventData = get_event_data(self._w3.codec, event_abi, context.result)
+        event_data: EventData = get_event_data(self._w3.codec, event_abi, result)
 
         event = Event(event=event_data["event"],
                       args=event_data["args"],
@@ -237,7 +286,7 @@ class Subscription:
                       address=event_data["address"])
         if hasattr(context, "predicate") and not context.predicate(event):
             return
-        await self.process_event_log(event)
+        await self.process_event_log_from_subscription(event)
 
     async def process_event_log(self, event: Event):
         raise NotImplementedError
@@ -245,13 +294,23 @@ class Subscription:
     async def process_new_block(self, block: Block):
         raise NotImplementedError
 
+    async def process_event_log_from_subscription(self, event: Event):
+        """Handle a log event received via the live subscription."""
+
+        await self.process_event_log(event)
+
+    async def process_new_block_from_subscription(self, block: Block):
+        """Handle a block update received via the live subscription."""
+
+        await self.process_new_block(block)
+
 
 class TerminalSubscription(Subscription):
     async def process_event_log(self, event: Event):
-        logger.warning(f"Event %s emitted with data: %s", event.event, event.args)
+        logger.warning("Event %s emitted with data: %s", event.event, event.args)
 
     async def process_new_block(self, block):
-        logger.warning(f"Current block number: %s", block.number)
+        logger.warning("Current block number: %s", block.number)
 
 
 if __name__ == '__main__':
