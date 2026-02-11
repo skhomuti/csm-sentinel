@@ -5,8 +5,12 @@ from aiogram.utils.formatting import Text, Bold, TextLink, Code, Italic
 from web3.constants import ADDRESS_ZERO
 from csm_bot.config import get_config
 
-markdown = lambda *args, **kwargs: Text(*args, **kwargs).as_markdown()
-nl = lambda x=2: "\n" * x
+def markdown(*args, **kwargs) -> str:
+    return Text(*args, **kwargs).as_markdown()
+
+
+def nl(x: int = 2) -> str:
+    return "\n" * x
 
 
 class RegisterEventMessage:
@@ -221,8 +225,12 @@ NODE_OPERATOR_UNFOLLOWED = "You are no longer following Node Operator #{}"
 NODE_OPERATOR_CANT_UNFOLLOW = "Can't unfollow the Node Operator you are not following. \nPlease enter the correct id."
 EVENT_EMITS = "Event {} emitted with data: \n{}"
 
-EVENT_MESSAGE_FOOTER = lambda noId, link: Text(nl(), f"nodeOperatorId: {noId}\n", TextLink("Transaction", url=link))
-EVENT_MESSAGE_FOOTER_TX_ONLY = lambda x: Text(nl(), TextLink("Transaction", url=x))
+def EVENT_MESSAGE_FOOTER(no_id, link) -> Text:
+    return Text(nl(), f"nodeOperatorId: {no_id}\n", TextLink("Transaction", url=link))
+
+
+def EVENT_MESSAGE_FOOTER_TX_ONLY(link) -> Text:
+    return Text(nl(), TextLink("Transaction", url=link))
 
 
 @RegisterEventMessage("DepositedSigningKeysCountChanged")

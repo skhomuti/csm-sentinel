@@ -79,22 +79,29 @@ async def stop_anvil(instance: AnvilInstance) -> None:
         await instance.process.wait()
 
 
-async def build_subscription(ws_url: str) -> "EventReplayHarness":
+async def build_subscription(ws_url: str, http_url: str) -> "EventReplayHarness":
     from csm_bot.config import get_config_async
     from csm_bot.app.module_adapter import build_module_adapter_from_config
 
     persistent_w3 = AsyncWeb3(WebSocketProvider(ws_url, max_connection_retries=-1))
+    backfill_w3 = AsyncWeb3(AsyncHTTPProvider(http_url))
     w3 = AsyncWeb3(WebSocketProvider(ws_url, max_connection_retries=-1))
     cfg = await get_config_async()
     module_adapter = build_module_adapter_from_config(cfg, w3)
-    return EventReplayHarness(persistent_w3, w3, module_adapter)
+    return EventReplayHarness(persistent_w3, w3, backfill_w3, module_adapter)
 
 
 class EventReplayHarness(Subscription):
     """Minimal replay helper mirroring subscription entrypoints."""
 
-    def __init__(self, persistent_w3: AsyncWeb3, w3: AsyncWeb3, module_adapter) -> None:
-        super().__init__(persistent_w3, module_adapter.allowed_events())
+    def __init__(
+        self,
+        persistent_w3: AsyncWeb3,
+        w3: AsyncWeb3,
+        backfill_w3: AsyncWeb3,
+        module_adapter,
+    ) -> None:
+        super().__init__(persistent_w3, module_adapter.allowed_events(), backfill_w3=backfill_w3)
         self.event_messages = EventMessages(w3, module_adapter)
         self.processed_events: list[tuple[Event, str]] = []
 

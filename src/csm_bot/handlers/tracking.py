@@ -11,8 +11,37 @@ if TYPE_CHECKING:
 
 async def chat_migration(update: Update, context: "BotContext") -> None:
     message = update.message
-    if message is not None:
-        context.application.migrate_chat_data(message=message)
+    if message is None:
+        return
+
+    old_chat_id: int | None = None
+    new_chat_id: int | None = None
+
+    # telegram sends either migrate_to_chat_id (old group) or migrate_from_chat_id (new supergroup)
+    if message.migrate_to_chat_id is not None:
+        old_chat_id = message.chat_id
+        new_chat_id = message.migrate_to_chat_id
+    elif message.migrate_from_chat_id is not None:
+        old_chat_id = message.migrate_from_chat_id
+        new_chat_id = message.chat_id
+
+    if old_chat_id is None or new_chat_id is None:
+        return
+
+    context.application.migrate_chat_data(message=message)
+
+    # Keep bot-level indexes (chat id sets and node operator target mapping) consistent.
+    bot_storage = context.bot_storage
+    bot_storage.migrate_chat_id(old_chat_id, new_chat_id)
+
+    # Ensure node operator mapping contains the new chat id for the migrated per-chat subscriptions.
+    new_chat_data = context.application.chat_data.get(new_chat_id)
+    if new_chat_data:
+        chat_storage = context.chat_storage(chat_data=new_chat_data)
+        for node_operator_id in chat_storage.node_operators.ids():
+            bot_storage.node_operator_chats.subscribe(node_operator_id, new_chat_id)
+
+    logger.info("Migrated chat id %s -> %s", old_chat_id, new_chat_id)
 
 
 async def add_user_if_required(update: Update, context: "BotContext") -> None:
@@ -51,7 +80,10 @@ def extract_status_change(chat_member_update: ChatMemberUpdated) -> tuple[bool, 
 
 async def track_chats(update: Update, context: "BotContext") -> None:
     """Track joins/leaves across private chats, groups, and channels."""
-    result = extract_status_change(update.my_chat_member)
+    member_update = update.my_chat_member
+    if member_update is None:
+        return
+    result = extract_status_change(member_update)
     if result is None:
         return
     was_member, is_member = result

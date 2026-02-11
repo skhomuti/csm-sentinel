@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol, TYPE_CHECKING
+from collections.abc import Awaitable, Callable
+from typing import Any, Protocol, TYPE_CHECKING
 
 from web3 import AsyncWeb3
 
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
     from csm_bot.events import EventMessages, NotificationPlan
     from csm_bot.models import Event
 
-EventHandler = Callable[["EventMessages", "Event"], "NotificationPlan | str | None"]
+EventHandler = Callable[["EventMessages", "Event"], Awaitable["NotificationPlan | str | None"]]
 
 
 @dataclass(frozen=True, slots=True)

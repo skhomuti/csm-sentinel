@@ -1,0 +1,5 @@
+[src]
+include = ["src/csm_bot"]
+
+[environment]
+python-version = "3.11"

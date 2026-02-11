@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from pathlib import Path
+from contextlib import suppress
 
 from telegram.ext import AIORateLimiter, ApplicationBuilder, ContextTypes
 from web3 import AsyncWeb3, WebSocketProvider
@@ -21,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 def create_runtime() -> BotRuntime:
     cfg = get_config()
+    if cfg.token is None:
+        raise RuntimeError("TOKEN must be configured")
 
     storage_path = Path(cfg.filestorage_path)
     storage_path.mkdir(parents=True, exist_ok=True)
@@ -44,6 +47,9 @@ def create_runtime() -> BotRuntime:
     rpc_provider = AsyncWeb3(
         WebSocketProvider(cfg.web3_socket_provider, max_connection_retries=-1)
     )
+    backfill_provider = AsyncWeb3(
+        WebSocketProvider(cfg.web3_socket_provider, max_connection_retries=-1)
+    )
 
     module_adapter = build_module_adapter_from_config(cfg, rpc_provider)
     event_messages = EventMessages(rpc_provider, module_adapter)
@@ -52,6 +58,7 @@ def create_runtime() -> BotRuntime:
         application,
         event_messages,
         module_adapter.allowed_events(),
+        backfill_w3=backfill_provider,
     )
     job_context = JobContext()
 
@@ -72,6 +79,10 @@ async def _run(runtime: BotRuntime) -> None:
     subscription = runtime.subscription
     job_context = runtime.job_context
     cfg = runtime.config
+
+    updater = application.updater
+    if updater is None:
+        raise RuntimeError("Application updater is not configured; cannot start polling")
 
     await application.initialize()
     await application.start()
@@ -94,18 +105,35 @@ async def _run(runtime: BotRuntime) -> None:
         block_from,
     )
 
+    subscription_task: asyncio.Task[None] | None = None
     try:
         error_callback = build_error_callback(application)
-        await application.updater.start_polling(error_callback=error_callback)
+        await updater.start_polling(error_callback=error_callback)
         subscription.setup_signal_handlers(asyncio.get_running_loop())
+
+        # Start the live subscription first, then backfill up to a post-subscribe head.
+        # This avoids missing blocks mined while historical catch-up is running.
+        subscription_task = asyncio.create_task(subscription.subscribe())
+        await subscription.wait_until_subscribed()
+
         if block_from:
-            await subscription.process_blocks_from(block_from)
-        await subscription.subscribe()
+            catchup_head = await subscription.get_block_number()
+            subscription.start_catchup(catchup_head)
+            await subscription.process_blocks_from(block_from, end_block=catchup_head)
+            subscription.finish_catchup()
+
+        await subscription_task
     except asyncio.CancelledError:  # pragma: no cover - shutdown guard
         pass
     finally:
+        # Ensure shutdown never hangs on unexpected failures (e.g., subscription startup timeouts).
+        subscription.request_shutdown()
+        if subscription_task is not None and not subscription_task.done():
+            subscription_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await subscription_task
         await subscription.shutdown()
-        await application.updater.stop()
+        await updater.stop()
         await application.stop()
         await application.shutdown()
 

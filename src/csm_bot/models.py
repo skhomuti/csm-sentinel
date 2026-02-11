@@ -1,5 +1,7 @@
 import dataclasses
 import json
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING
 
 from eth_typing import ChecksumAddress
 from hexbytes import HexBytes
@@ -35,4 +37,10 @@ class Event:
 class EventHandler:
     """Dataclass to represent an event handler."""
     event: str
-    handler: callable
+    handler: "EventHandlerFn"
+
+
+if TYPE_CHECKING:
+    from csm_bot.events import EventMessages, NotificationPlan
+
+EventHandlerFn = Callable[["EventMessages", Event], Awaitable["NotificationPlan | str | None"]]

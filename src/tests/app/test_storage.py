@@ -106,6 +106,21 @@ def test_chat_id_set_normalisation_and_mutations():
     snapshot.add(99)
     assert 99 not in chat_ids.all()
 
+def test_chat_id_set_migrate_chat_id_replaces_existing():
+    bot_data: dict[str, object] = {"group_ids": {100}}
+    chat_ids = ChatIdSet(bot_data, "group_ids")
+
+    assert chat_ids.migrate_chat_id(100, 200) is True
+    assert chat_ids.contains(200)
+    assert not chat_ids.contains(100)
+
+def test_chat_id_set_migrate_chat_id_noop_when_missing():
+    bot_data: dict[str, object] = {"group_ids": {100}}
+    chat_ids = ChatIdSet(bot_data, "group_ids")
+
+    assert chat_ids.migrate_chat_id(999, 200) is False
+    assert chat_ids.contains(100)
+
 
 # NodeOperatorChats
 
@@ -134,6 +149,19 @@ def test_node_operator_chats_subscribe_unsubscribe_preserve_keys():
     chats.unsubscribe("alpha", 200)
     assert chats.ids() == {"alpha"}
     assert chats.chats_for("alpha") == set()
+
+def test_node_operator_chats_migrate_chat_id_updates_all_mappings():
+    bot_data: dict[str, object] = {}
+    chats = NodeOperatorChats(bot_data)
+    chats.subscribe("alpha", 100)
+    chats.subscribe("beta", 200)
+    chats.subscribe("beta", 100)
+
+    updated = chats.migrate_chat_id(100, 300)
+
+    assert updated == 2
+    assert chats.chats_for("alpha") == {300}
+    assert chats.chats_for("beta") == {200, 300}
 
 
 def test_node_operator_chats_resolve_targets_filters_non_actual():
@@ -189,6 +217,20 @@ def test_bot_storage_wrappers_use_underlying_helpers():
         "alpha": {"total": 1, "users": 1, "groups": 0, "channels": 0},
         "beta": {"total": 1, "users": 0, "groups": 1, "channels": 0},
     }
+
+def test_bot_storage_migrate_chat_id_updates_chat_sets_and_targets():
+    bot_data: dict[str, object] = {
+        "group_ids": {200},
+        "no_ids_to_chats": {"42": {200}, "empty": set()},
+    }
+    storage = BotStorage(bot_data)
+
+    storage.migrate_chat_id(200, 300)
+
+    assert storage.groups.contains(300)
+    assert not storage.groups.contains(200)
+    assert storage.node_operator_chats.chats_for("42") == {300}
+    assert storage.node_operator_chats.ids() == {"42", "empty"}
 
 
 # NodeOperatorSubscriptions

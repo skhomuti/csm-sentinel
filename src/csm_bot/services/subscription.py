@@ -19,12 +19,38 @@ if TYPE_CHECKING:
 class TelegramSubscription(Subscription):
     """Bridge Web3 subscription events into the Telegram application update queue."""
 
-    def __init__(self, w3, application: Application, event_messages, allowed_events: set[str]) -> None:
-        super().__init__(w3, allowed_events)
+    def __init__(
+        self,
+        w3,
+        application: Application,
+        event_messages,
+        allowed_events: set[str],
+        *,
+        backfill_w3=None,
+    ) -> None:
+        super().__init__(w3, allowed_events, backfill_w3=backfill_w3)
         self.application = application
         self.event_messages = event_messages
+        self._ignore_subscription_events_until_block: int | None = None
+        self._suppress_subscription_block_updates = False
+
+    def start_catchup(self, until_block: int) -> None:
+        # During catch-up we backfill blocks up to `until_block`. Live subscription notifications for those
+        # blocks are redundant and can lead to duplicates; suppress them.
+        self._ignore_subscription_events_until_block = int(until_block)
+        self._suppress_subscription_block_updates = True
+
+    def finish_catchup(self) -> None:
+        # Allow live block updates again once catch-up finishes.
+        self._suppress_subscription_block_updates = False
 
     async def process_event_log(self, event: Event):
+        await self.application.update_queue.put(event)
+
+    async def process_event_log_from_subscription(self, event: Event):
+        threshold = self._ignore_subscription_events_until_block
+        if threshold is not None and event.block <= threshold:
+            return
         await self.application.update_queue.put(event)
 
     async def handle_event_log(self, event: Event, context: "BotContext"):
@@ -89,6 +115,11 @@ class TelegramSubscription(Subscription):
             logger.info("Messages sent: %s", sent_messages)
 
     async def process_new_block(self, block: Block):
+        await self.application.update_queue.put(block)
+
+    async def process_new_block_from_subscription(self, block: Block):
+        if self._suppress_subscription_block_updates:
+            return
         await self.application.update_queue.put(block)
 
     async def handle_new_block(self, block: Block, context: "BotContext"):

@@ -38,8 +38,8 @@ class BroadcastSession:
     def __init__(self, context: "BotContext") -> None:
         self._context = context
 
-    def store_prompt(self, message: Message | None) -> None:
-        if message is None:
+    def store_prompt(self, message: Message | bool | None) -> None:
+        if not isinstance(message, Message):
             return
         self._context.user_data[self.PROMPT_CHAT_ID_KEY] = message.chat_id
         self._context.user_data[self.PROMPT_MESSAGE_ID_KEY] = message.message_id
