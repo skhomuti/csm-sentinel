@@ -1,9 +1,10 @@
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src.csm_bot.app.storage import BotStorage
-from src.csm_bot.jobs import JobContext
+from src.csm_bot.jobs import JobContext, BLOCK_LAG_THRESHOLD, ALERT_INTERVAL_MINUTES
 from src.csm_bot.texts import NO_NEW_BLOCKS_ADMIN_ALERT
 
 
@@ -21,37 +22,108 @@ def _make_context(admin_ids: set[int], block: int, bot: StubBot) -> SimpleNamesp
     return SimpleNamespace(bot_storage=bot_storage, runtime=runtime, bot=bot)
 
 
+def _make_subscription(chain_head: int = 0) -> SimpleNamespace:
+    sub = SimpleNamespace()
+    sub.get_block_number = AsyncMock(return_value=chain_head)
+    return sub
+
+
 @pytest.mark.asyncio
-async def test_job_context_notifies_admins_only_once_per_block():
-    admin_ids = {1, 99}
+async def test_no_alert_when_chain_head_not_polled():
     bot = StubBot()
-    context = _make_context(admin_ids, block=123_456, bot=bot)
+    context = _make_context({1}, block=100, bot=bot)
+    job_context = JobContext(_make_subscription())
 
-    job_context = JobContext()
-
-    # Initial run seeds the latest block without notifying.
+    # chain_head is 0 (not yet polled) -> no alert
     await job_context.callback_block_processing_check(context)
-    assert job_context.latest_block == 123_456
     assert not bot.sent_messages
 
-    # Second run without progress triggers a single alert to all admins.
+
+@pytest.mark.asyncio
+async def test_no_alert_when_lag_within_threshold():
+    bot = StubBot()
+    persisted = 1000
+    chain_head = persisted + BLOCK_LAG_THRESHOLD  # exactly at threshold, not over
+    context = _make_context({1}, block=persisted, bot=bot)
+
+    sub = _make_subscription(chain_head)
+    job_context = JobContext(sub)
+    job_context._chain_head = chain_head
+
+    await job_context.callback_block_processing_check(context)
+    assert not bot.sent_messages
+
+
+@pytest.mark.asyncio
+async def test_alert_when_lag_exceeds_threshold():
+    admin_ids = {1, 99}
+    bot = StubBot()
+    persisted = 1000
+    chain_head = persisted + BLOCK_LAG_THRESHOLD + 1
+    context = _make_context(admin_ids, block=persisted, bot=bot)
+
+    sub = _make_subscription(chain_head)
+    job_context = JobContext(sub)
+    job_context._chain_head = chain_head
+
     await job_context.callback_block_processing_check(context)
     expected_message = NO_NEW_BLOCKS_ADMIN_ALERT.format(
-        minutes=job_context.alert_interval_minutes,
-        block=123_456,
+        minutes=ALERT_INTERVAL_MINUTES,
+        block=persisted,
     )
-    assert sorted(bot.sent_messages) == sorted((admin_id, expected_message) for admin_id in admin_ids)
+    assert sorted(bot.sent_messages) == sorted((aid, expected_message) for aid in admin_ids)
 
-    # Further runs for the same block do not re-alert until progress happens.
-    await job_context.callback_block_processing_check(context)
-    assert len(bot.sent_messages) == len(admin_ids)
 
-    # Simulate new block -> state resets.
-    context.bot_storage.block.update(123_457)
-    await job_context.callback_block_processing_check(context)
-    assert job_context.latest_block == 123_457
-    assert job_context.alerted_for_block is None
+@pytest.mark.asyncio
+async def test_alert_only_once_until_recovered():
+    admin_ids = {1}
+    bot = StubBot()
+    persisted = 1000
+    chain_head = persisted + BLOCK_LAG_THRESHOLD + 50
+    context = _make_context(admin_ids, block=persisted, bot=bot)
 
-    # Stalling again on the new block should notify one more time.
+    sub = _make_subscription(chain_head)
+    job_context = JobContext(sub)
+    job_context._chain_head = chain_head
+
+    # First check -> alert
     await job_context.callback_block_processing_check(context)
-    assert len(bot.sent_messages) == len(admin_ids) * 2
+    assert len(bot.sent_messages) == 1
+
+    # Second check, still lagging -> no additional alert
+    job_context._chain_head = chain_head + 10
+    await job_context.callback_block_processing_check(context)
+    assert len(bot.sent_messages) == 1
+
+    # Persisted block catches up -> reset
+    context.bot_storage.block.update(chain_head + 10)
+    await job_context.callback_block_processing_check(context)
+    assert len(bot.sent_messages) == 1
+    assert not job_context._alerted
+
+    # Falls behind again -> new alert
+    job_context._chain_head = chain_head + 10 + BLOCK_LAG_THRESHOLD + 1
+    await job_context.callback_block_processing_check(context)
+    assert len(bot.sent_messages) == 2
+
+
+@pytest.mark.asyncio
+async def test_poll_chain_head():
+    sub = _make_subscription(999_999)
+    job_context = JobContext(sub)
+
+    await job_context._poll_chain_head(None)
+    assert job_context._chain_head == 999_999
+    sub.get_block_number.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_poll_chain_head_failure_does_not_crash():
+    sub = _make_subscription()
+    sub.get_block_number = AsyncMock(side_effect=Exception("connection lost"))
+    job_context = JobContext(sub)
+    job_context._chain_head = 42
+
+    await job_context._poll_chain_head(None)
+    # chain_head should remain unchanged after failure
+    assert job_context._chain_head == 42

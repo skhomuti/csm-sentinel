@@ -44,9 +44,7 @@ def create_runtime() -> BotRuntime:
     persistent_provider = AsyncWeb3(
         WebSocketProvider(cfg.web3_socket_provider, max_connection_retries=-1)
     )
-    rpc_provider = AsyncWeb3(
-        WebSocketProvider(cfg.web3_socket_provider, max_connection_retries=-1)
-    )
+    rpc_provider = AsyncWeb3(WebSocketProvider(cfg.web3_socket_provider, max_connection_retries=-1))
     backfill_provider = AsyncWeb3(
         WebSocketProvider(cfg.web3_socket_provider, max_connection_retries=-1)
     )
@@ -60,7 +58,7 @@ def create_runtime() -> BotRuntime:
         module_adapter.allowed_events(),
         backfill_w3=backfill_provider,
     )
-    job_context = JobContext()
+    job_context = JobContext(subscription)
 
     runtime = BotRuntime(
         config=cfg,
