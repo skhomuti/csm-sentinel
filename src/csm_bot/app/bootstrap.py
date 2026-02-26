@@ -96,8 +96,6 @@ async def _run(runtime: BotRuntime) -> None:
         else normalize_block_number(application.bot_data.get("block"))
     )
 
-    await job_context.schedule(application)
-
     logger.info(
         "Bot started. Latest processed block number: %s",
         block_from,
@@ -119,6 +117,8 @@ async def _run(runtime: BotRuntime) -> None:
             subscription.start_catchup(catchup_head)
             await subscription.process_blocks_from(block_from, end_block=catchup_head)
             subscription.finish_catchup()
+
+        await job_context.schedule(application)
 
         await subscription_task
     except asyncio.CancelledError:  # pragma: no cover - shutdown guard
