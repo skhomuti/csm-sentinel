@@ -87,10 +87,14 @@ class Subscription:
         await asyncio.wait_for(self._subscriptions_started.wait(), timeout=timeout)
 
     async def get_block_number(self) -> int:
-        """Return the latest block number from the provider."""
+        """Return the latest block number from the persistent provider.
 
-        w3 = await anext(self.backfill_w3)
-        return await w3.eth.get_block_number()
+        Uses the main (subscription) provider rather than the backfill provider
+        to avoid contention when backfill is running concurrently.
+        """
+
+        async for w3 in self.w3:
+            return await w3.eth.get_block_number()
 
     @property
     async def w3(self):
