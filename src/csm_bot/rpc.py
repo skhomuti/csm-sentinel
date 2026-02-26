@@ -87,10 +87,14 @@ class Subscription:
         await asyncio.wait_for(self._subscriptions_started.wait(), timeout=timeout)
 
     async def get_block_number(self) -> int:
-        """Return the latest block number from the provider."""
+        """Return the latest block number from the persistent provider.
 
-        w3 = await anext(self.backfill_w3)
-        return await w3.eth.get_block_number()
+        Uses the main (subscription) provider rather than the backfill provider
+        to avoid contention when backfill is running concurrently.
+        """
+
+        async for w3 in self.w3:
+            return await w3.eth.get_block_number()
 
     @property
     async def w3(self):
@@ -198,6 +202,7 @@ class Subscription:
         end_block = end_block or await w3.eth.get_block_number()
         if start_block >= end_block:
             logger.info("No blocks to process")
+            logger.info("Backfill complete at block %s", end_block)
             return
         logger.info("Processing blocks from %s to %s", start_block, end_block)
         batch_size = self.cfg.block_batch_size
@@ -253,6 +258,10 @@ class Subscription:
                 break
             await self.process_new_block(Block(number=batch_end))
             logger.debug("Processed blocks up to %s", batch_end)
+        if self._shutdown_event.is_set():
+            logger.warning("Backfill interrupted before reaching block %s", end_block)
+            return
+        logger.info("Backfill complete at block %s", end_block)
 
     async def _throttle_process_blocks_request(self):
         if self._process_blocks_request_interval is None:
@@ -292,7 +301,7 @@ class Subscription:
         raise NotImplementedError
 
     async def process_new_block(self, block: Block):
-        """Called at the end of each backfill batch. No-op by default."""
+        raise NotImplementedError
 
     async def process_event_log_from_subscription(self, event: Event):
         """Handle a log event received via the live subscription."""

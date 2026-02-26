@@ -5,7 +5,7 @@ from hexbytes import HexBytes
 import pytest
 
 from src.csm_bot.app.storage import BotStorage
-from src.csm_bot.models import Event
+from src.csm_bot.models import Block, Event
 from src.csm_bot.services.subscription import TelegramSubscription
 
 
@@ -65,3 +65,23 @@ async def test_handle_event_log_advances_block_with_notification_plan():
     await sub.handle_event_log(_make_event(block=200), context)
 
     assert context.bot_storage.block.value == 200
+
+
+@pytest.mark.asyncio
+async def test_process_new_block_advances_persisted_block():
+    sub = TelegramSubscription.__new__(TelegramSubscription)
+    sub.application = SimpleNamespace(bot_data={"block": 100})
+
+    await sub.process_new_block(Block(number=200))
+
+    assert BotStorage(sub.application.bot_data).block.value == 200
+
+
+@pytest.mark.asyncio
+async def test_process_new_block_does_not_regress_persisted_block():
+    sub = TelegramSubscription.__new__(TelegramSubscription)
+    sub.application = SimpleNamespace(bot_data={"block": 500})
+
+    await sub.process_new_block(Block(number=300))
+
+    assert BotStorage(sub.application.bot_data).block.value == 500
