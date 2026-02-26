@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from csm_bot.rpc import Subscription
 
 CHAIN_HEAD_POLL_INTERVAL_SECONDS = 5 * 60  # 5 minutes
-BLOCK_LAG_THRESHOLD = 200  # ~40 minutes of blocks
 ALERT_INTERVAL_MINUTES = 30
 
 
@@ -24,6 +23,7 @@ class JobContext:
     def __init__(self, subscription: "Subscription") -> None:
         self._subscription = subscription
         self._chain_head: int = 0
+        self._last_checked_chain_head: int = 0
 
     async def schedule(self, app: Application):
         interval_seconds = 60 * ALERT_INTERVAL_MINUTES
@@ -38,9 +38,13 @@ class JobContext:
             first=0,
         )
 
-    async def _poll_chain_head(self, _context: "BotContext"):
+    async def _poll_chain_head(self, context: "BotContext"):
         try:
             self._chain_head = await self._subscription.get_block_number()
+            if context is not None:
+                context.bot_storage.block.update(
+                    max(context.bot_storage.block.value, self._chain_head)
+                )
             logger.debug("Polled chain head: %s", self._chain_head)
         except Exception as exc:
             logger.warning("Failed to poll chain head: %s", exc)
@@ -48,20 +52,21 @@ class JobContext:
     async def callback_block_processing_check(self, context: "BotContext"):
         if not self._chain_head:
             return
-        persisted_block = context.bot_storage.block.value
-        lag = self._chain_head - persisted_block
-        if lag > BLOCK_LAG_THRESHOLD:
+        if not self._last_checked_chain_head:
+            self._last_checked_chain_head = self._chain_head
+            return
+        if self._chain_head <= self._last_checked_chain_head:
             logger.warning(
-                "Block processing lag: chain head %s, persisted %s (lag %s)",
+                "No new chain heads in the last %s minutes. Latest chain head: %s",
+                ALERT_INTERVAL_MINUTES,
                 self._chain_head,
-                persisted_block,
-                lag,
             )
             if self._alerted:
                 return
-            await self._notify_admins(context, persisted_block)
+            await self._notify_admins(context, self._chain_head)
             self._alerted = True
             return
+        self._last_checked_chain_head = self._chain_head
         self._alerted = False
 
     async def _notify_admins(self, context: "BotContext", current_block: int) -> None:

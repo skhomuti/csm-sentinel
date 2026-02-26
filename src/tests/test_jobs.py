@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src.csm_bot.app.storage import BotStorage
-from src.csm_bot.jobs import JobContext, BLOCK_LAG_THRESHOLD, ALERT_INTERVAL_MINUTES
+from src.csm_bot.jobs import JobContext, ALERT_INTERVAL_MINUTES
 from src.csm_bot.texts import NO_NEW_BLOCKS_ADMIN_ALERT
 
 
@@ -40,69 +40,68 @@ async def test_no_alert_when_chain_head_not_polled():
 
 
 @pytest.mark.asyncio
-async def test_no_alert_when_lag_within_threshold():
+async def test_no_alert_on_first_check_after_poll():
     bot = StubBot()
-    persisted = 1000
-    chain_head = persisted + BLOCK_LAG_THRESHOLD  # exactly at threshold, not over
-    context = _make_context({1}, block=persisted, bot=bot)
+    chain_head = 1000
+    context = _make_context({1}, block=0, bot=bot)
 
     sub = _make_subscription(chain_head)
     job_context = JobContext(sub)
     job_context._chain_head = chain_head
 
     await job_context.callback_block_processing_check(context)
+    assert job_context._last_checked_chain_head == chain_head
     assert not bot.sent_messages
 
 
 @pytest.mark.asyncio
-async def test_alert_when_lag_exceeds_threshold():
+async def test_alert_when_chain_head_does_not_advance():
     admin_ids = {1, 99}
     bot = StubBot()
-    persisted = 1000
-    chain_head = persisted + BLOCK_LAG_THRESHOLD + 1
-    context = _make_context(admin_ids, block=persisted, bot=bot)
+    chain_head = 1000
+    context = _make_context(admin_ids, block=0, bot=bot)
 
     sub = _make_subscription(chain_head)
     job_context = JobContext(sub)
+    job_context._last_checked_chain_head = chain_head
     job_context._chain_head = chain_head
 
     await job_context.callback_block_processing_check(context)
     expected_message = NO_NEW_BLOCKS_ADMIN_ALERT.format(
         minutes=ALERT_INTERVAL_MINUTES,
-        block=persisted,
+        block=chain_head,
     )
     assert sorted(bot.sent_messages) == sorted((aid, expected_message) for aid in admin_ids)
 
 
 @pytest.mark.asyncio
-async def test_alert_only_once_until_recovered():
+async def test_alert_only_once_until_chain_head_advances():
     admin_ids = {1}
     bot = StubBot()
-    persisted = 1000
-    chain_head = persisted + BLOCK_LAG_THRESHOLD + 50
-    context = _make_context(admin_ids, block=persisted, bot=bot)
+    chain_head = 1000
+    context = _make_context(admin_ids, block=0, bot=bot)
 
     sub = _make_subscription(chain_head)
     job_context = JobContext(sub)
+    job_context._last_checked_chain_head = chain_head
     job_context._chain_head = chain_head
 
     # First check -> alert
     await job_context.callback_block_processing_check(context)
     assert len(bot.sent_messages) == 1
 
-    # Second check, still lagging -> no additional alert
-    job_context._chain_head = chain_head + 10
+    # Second check, still no progress -> no additional alert
+    job_context._chain_head = chain_head
     await job_context.callback_block_processing_check(context)
     assert len(bot.sent_messages) == 1
 
-    # Persisted block catches up -> reset
-    context.bot_storage.block.update(chain_head + 10)
+    # Chain head advances -> reset
+    job_context._chain_head = chain_head + 10
     await job_context.callback_block_processing_check(context)
     assert len(bot.sent_messages) == 1
     assert not job_context._alerted
 
-    # Falls behind again -> new alert
-    job_context._chain_head = chain_head + 10 + BLOCK_LAG_THRESHOLD + 1
+    # Stalls again -> new alert
     await job_context.callback_block_processing_check(context)
     assert len(bot.sent_messages) == 2
 
@@ -111,9 +110,11 @@ async def test_alert_only_once_until_recovered():
 async def test_poll_chain_head():
     sub = _make_subscription(999_999)
     job_context = JobContext(sub)
+    context = _make_context({1}, block=100, bot=StubBot())
 
-    await job_context._poll_chain_head(None)
+    await job_context._poll_chain_head(context)
     assert job_context._chain_head == 999_999
+    assert context.bot_storage.block.value == 999_999
     sub.get_block_number.assert_awaited_once()
 
 
