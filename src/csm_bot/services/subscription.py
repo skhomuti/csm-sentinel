@@ -52,6 +52,7 @@ class TelegramSubscription(Subscription):
 
     async def handle_event_log(self, event: Event, context: "BotContext"):
         logger.info("Handle event on the block %s: %s", event.block, event.readable())
+        context.bot_storage.block.update(max(context.bot_storage.block.value, event.block))
         bot_storage = context.bot_storage
         actual_chat_ids = bot_storage.actual_chat_ids()
         node_operator_chats = bot_storage.node_operator_chats
@@ -110,8 +111,6 @@ class TelegramSubscription(Subscription):
 
         if sent_messages:
             logger.info("Messages sent: %s", sent_messages)
-
-        context.bot_storage.block.update(max(context.bot_storage.block.value, event.block))
 
     def register_handlers(self) -> None:
         """Attach type handlers for event updates to the application."""
