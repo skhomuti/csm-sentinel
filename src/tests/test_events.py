@@ -27,92 +27,148 @@ class _FakeFetcher:
             raise self.exc
         return self.result
 
+
 def test_limit_set_mode_1():
     result = target_validators_count_changed(0, 0, 1, 10)
-    expected = ("🚨 *Target validators count changed*\n\n"
-                r"The limit has been set to 10\."
-                "\n"
-                r"10 keys will be requested to exit first\.")
+    expected = (
+        "🚨 *Target validators count changed*\n\n"
+        r"The limit has been set to 10\."
+        "\n"
+        r"10 keys will be requested to exit first\."
+    )
     assert result == expected
+
 
 def test_limit_set_mode_2():
     result = target_validators_count_changed(0, 0, 2, 10)
-    expected = ("🚨 *Target validators count changed*\n\n"
-                r"The limit has been set to 10\."
-                "\n"
-                r"10 keys will be requested to exit immediately\.")
+    expected = (
+        "🚨 *Target validators count changed*\n\n"
+        r"The limit has been set to 10\."
+        "\n"
+        r"10 keys will be requested to exit immediately\."
+    )
     assert result == expected
+
 
 def test_limit_set_mode_2_from_1():
     result = target_validators_count_changed(1, 5, 2, 10)
-    expected = ("🚨 *Target validators count changed*\n\n"
-                r"The limit has been set to 10\."
-                "\n"
-                r"10 keys will be requested to exit immediately\.")
+    expected = (
+        "🚨 *Target validators count changed*\n\n"
+        r"The limit has been set to 10\."
+        "\n"
+        r"10 keys will be requested to exit immediately\."
+    )
     assert result == expected
+
 
 def test_limit_set_mode_1_from_2():
     result = target_validators_count_changed(2, 5, 1, 10)
-    expected = ("🚨 *Target validators count changed*\n\n"
-                r"The limit has been set to 10\."
-                "\n"
-                r"10 keys will be requested to exit first\.")
+    expected = (
+        "🚨 *Target validators count changed*\n\n"
+        r"The limit has been set to 10\."
+        "\n"
+        r"10 keys will be requested to exit first\."
+    )
     assert result == expected
 
 
 def test_limit_decreased_mode_1():
     result = target_validators_count_changed(1, 10, 1, 3)
-    expected = ("🚨 *Target validators count changed*\n\n"
-                r"The limit has been decreased from 10 to 3\."
-                "\n"
-                r"7 more key\(s\) will be requested to exit first\.")
+    expected = (
+        "🚨 *Target validators count changed*\n\n"
+        r"The limit has been decreased from 10 to 3\."
+        "\n"
+        r"7 more key\(s\) will be requested to exit first\."
+    )
     assert result == expected
+
 
 def test_limit_decreased_mode_2():
     result = target_validators_count_changed(2, 10, 2, 3)
-    expected = ("🚨 *Target validators count changed*\n\n"
-                r"The limit has been decreased from 10 to 3\."
-                "\n"
-                r"7 more key\(s\) will be requested to exit immediately\.")
+    expected = (
+        "🚨 *Target validators count changed*\n\n"
+        r"The limit has been decreased from 10 to 3\."
+        "\n"
+        r"7 more key\(s\) will be requested to exit immediately\."
+    )
     assert result == expected
+
 
 def test_limit_to_zero_exit_first():
     result = target_validators_count_changed(1, 10, 1, 0)
-    expected = ("🚨 *Target validators count changed*\n\n"
-                r"The limit has been set to zero\."
-                "\n"
-                r"All keys will be requested to exit first\.")
+    expected = (
+        "🚨 *Target validators count changed*\n\n"
+        r"The limit has been set to zero\."
+        "\n"
+        r"All keys will be requested to exit first\."
+    )
     assert result == expected
+
 
 def test_limit_to_zero_exit_immediately():
     result = target_validators_count_changed(2, 10, 2, 0)
-    expected = ("🚨 *Target validators count changed*\n\n"
-                r"The limit has been set to zero\."
-                "\n"
-                r"All keys will be requested to exit immediately\.")
+    expected = (
+        "🚨 *Target validators count changed*\n\n"
+        r"The limit has been set to zero\."
+        "\n"
+        r"All keys will be requested to exit immediately\."
+    )
     assert result == expected
+
 
 def test_limit_to_zero_exit_first_no_previous_limit():
     result = target_validators_count_changed(0, 0, 1, 0)
-    expected = ("🚨 *Target validators count changed*\n\n"
-                r"The limit has been set to zero\."
-                "\n"
-                r"All keys will be requested to exit first\.")
+    expected = (
+        "🚨 *Target validators count changed*\n\n"
+        r"The limit has been set to zero\."
+        "\n"
+        r"All keys will be requested to exit first\."
+    )
     assert result == expected
+
 
 def test_limit_to_zero_exit_immediately_no_previous_limit():
     result = target_validators_count_changed(0, 0, 2, 0)
-    expected = ("🚨 *Target validators count changed*\n\n"
-                r"The limit has been set to zero\."
-                "\n"
-                r"All keys will be requested to exit immediately\.")
+    expected = (
+        "🚨 *Target validators count changed*\n\n"
+        r"The limit has been set to zero\."
+        "\n"
+        r"All keys will be requested to exit immediately\."
+    )
     assert result == expected
+
 
 def test_limit_unset_mode_zero():
     result = target_validators_count_changed(1, 10, 0, 0)
-    expected = ("🚨 *Target validators count changed*\n\n"
-                r"The limit has been set to zero\. No keys will be requested to exit\.")
+    expected = (
+        "🚨 *Target validators count changed*\n\n"
+        r"The limit has been set to zero\. No keys will be requested to exit\."
+    )
     assert result == expected
+
+
+@pytest.fixture(autouse=True)
+def _clear_alru_cache():
+    """Reset the alru_cache on _fetch_distribution_log between tests.
+
+    async_lru ≥ 2.2 enforces single-loop usage per cache instance. Since
+    pytest-asyncio creates a new event loop per test, we must also reset the
+    internal loop binding alongside the cached entries.
+    """
+    from src.csm_bot.events import EventMessages
+
+    def _reset():
+        instance_method = EventMessages._fetch_distribution_log
+        instance_method.cache_clear()
+        # Reach through to the underlying _LRUCacheWrapper and clear the
+        # event-loop binding so the next test can attach its own loop.
+        inner = instance_method._LRUCacheWrapperInstanceMethod__wrapper
+        inner._LRUCacheWrapper__first_loop = None
+
+    _reset()
+    yield
+    _reset()
+
 
 @pytest.mark.asyncio
 async def test_fetch_distribution_log_success():
@@ -180,10 +236,12 @@ async def test_distribution_log_updated_produces_strike_notifications():
     from src.csm_bot.models import Event
     import src.csm_bot.texts as texts
 
-    set_config(SimpleNamespace(
-        etherscan_tx_url_template="https://etherscan.io/tx/{}",
-        module_ui_url="https://csm.lido.fi",
-    ))
+    set_config(
+        SimpleNamespace(
+            etherscan_tx_url_template="https://etherscan.io/tx/{}",
+            module_ui_url="https://csm.lido.fi",
+        )
+    )
     event_messages = EventMessages.__new__(EventMessages)
     event_messages.cfg = await get_config_async()
 
@@ -196,11 +254,7 @@ async def test_distribution_log_updated_produces_strike_notifications():
                         "124": {"strikes": 2},
                     }
                 },
-                "777": {
-                    "validators": {
-                        "900": {"strikes": 0}
-                    }
-                },
+                "777": {"validators": {"900": {"strikes": 0}}},
             }
         }
     ]
@@ -247,10 +301,12 @@ async def test_distribution_log_updated_handles_empty_payload():
     from src.csm_bot.models import Event
     import src.csm_bot.texts as texts
 
-    set_config(SimpleNamespace(
-        etherscan_tx_url_template="https://etherscan.io/tx/{}",
-        module_ui_url="https://csm.lido.fi",
-    ))
+    set_config(
+        SimpleNamespace(
+            etherscan_tx_url_template="https://etherscan.io/tx/{}",
+            module_ui_url="https://csm.lido.fi",
+        )
+    )
     event_messages = EventMessages.__new__(EventMessages)
     event_messages.cfg = await get_config_async()
     event_messages._distribution_log_fetcher = _FakeFetcher(result={})
