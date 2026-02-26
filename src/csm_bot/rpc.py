@@ -292,7 +292,7 @@ class Subscription:
         raise NotImplementedError
 
     async def process_new_block(self, block: Block):
-        raise NotImplementedError
+        """Called at the end of each backfill batch. No-op by default."""
 
     async def process_event_log_from_subscription(self, event: Event):
         """Handle a log event received via the live subscription."""
