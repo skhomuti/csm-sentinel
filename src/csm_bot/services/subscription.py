@@ -5,7 +5,7 @@ from telegram import LinkPreviewOptions
 from telegram.constants import ParseMode
 from telegram.ext import Application, TypeHandler
 
-from csm_bot.models import Event
+from csm_bot.models import Block, Event
 from csm_bot.rpc import Subscription
 from csm_bot.app.storage import BotStorage
 
@@ -43,6 +43,11 @@ class TelegramSubscription(Subscription):
 
     async def process_event_log(self, event: Event):
         await self.application.update_queue.put(event)
+
+    async def process_new_block(self, block: Block):
+        # Persist backfill progress even for ranges with no matching events.
+        bot_storage = BotStorage(self.application.bot_data)
+        bot_storage.block.update(max(bot_storage.block.value, block.number))
 
     async def process_event_log_from_subscription(self, event: Event):
         threshold = self._ignore_subscription_events_until_block

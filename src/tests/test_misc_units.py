@@ -1,5 +1,7 @@
 import asyncio
 import os
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from unittest.mock import patch
 
 from hexbytes import HexBytes
@@ -143,3 +145,33 @@ async def test_process_blocks_rate_limit(monkeypatch, stub_discover_contract_add
         assert elapsed >= 0.45
     finally:
         clear_config()
+
+
+@pytest.mark.asyncio
+async def test_get_block_number_uses_persistent_provider():
+    from src.csm_bot.rpc import Subscription
+
+    main_w3 = SimpleNamespace(
+        provider=SimpleNamespace(
+            is_connected=AsyncMock(return_value=True),
+            connect=AsyncMock(),
+        ),
+        eth=SimpleNamespace(get_block_number=AsyncMock(return_value=111)),
+    )
+    backfill_w3 = SimpleNamespace(
+        provider=SimpleNamespace(
+            is_connected=AsyncMock(return_value=True),
+            connect=AsyncMock(),
+        ),
+        eth=SimpleNamespace(get_block_number=AsyncMock(return_value=222)),
+    )
+
+    subscription = Subscription.__new__(Subscription)
+    subscription._w3 = main_w3
+    subscription._backfill_w3 = backfill_w3
+
+    latest = await subscription.get_block_number()
+
+    assert latest == 111
+    main_w3.eth.get_block_number.assert_awaited_once()
+    backfill_w3.eth.get_block_number.assert_not_awaited()
