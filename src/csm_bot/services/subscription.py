@@ -5,7 +5,7 @@ from telegram import LinkPreviewOptions
 from telegram.constants import ParseMode
 from telegram.ext import Application, TypeHandler
 
-from csm_bot.models import Block, Event
+from csm_bot.models import Event
 from csm_bot.rpc import Subscription
 from csm_bot.app.storage import BotStorage
 
@@ -32,17 +32,14 @@ class TelegramSubscription(Subscription):
         self.application = application
         self.event_messages = event_messages
         self._ignore_subscription_events_until_block: int | None = None
-        self._suppress_subscription_block_updates = False
 
     def start_catchup(self, until_block: int) -> None:
         # During catch-up we backfill blocks up to `until_block`. Live subscription notifications for those
         # blocks are redundant and can lead to duplicates; suppress them.
         self._ignore_subscription_events_until_block = int(until_block)
-        self._suppress_subscription_block_updates = True
 
     def finish_catchup(self) -> None:
-        # Allow live block updates again once catch-up finishes.
-        self._suppress_subscription_block_updates = False
+        self._ignore_subscription_events_until_block = None
 
     async def process_event_log(self, event: Event):
         await self.application.update_queue.put(event)
@@ -114,21 +111,10 @@ class TelegramSubscription(Subscription):
         if sent_messages:
             logger.info("Messages sent: %s", sent_messages)
 
-    async def process_new_block(self, block: Block):
-        await self.application.update_queue.put(block)
-
-    async def process_new_block_from_subscription(self, block: Block):
-        if self._suppress_subscription_block_updates:
-            return
-        await self.application.update_queue.put(block)
-
-    async def handle_new_block(self, block: Block, context: "BotContext"):
-        logger.debug("Handle block: %s", block.number)
-        context.bot_storage.block.update(block.number)
+        context.bot_storage.block.update(max(context.bot_storage.block.value, event.block))
 
     def register_handlers(self) -> None:
-        """Attach type handlers for block and event updates to the application."""
-        self.application.add_handler(TypeHandler(Block, self.handle_new_block))
+        """Attach type handlers for event updates to the application."""
         self.application.add_handler(TypeHandler(Event, self.handle_event_log, block=False))
 
     def ensure_state_containers(self) -> None:

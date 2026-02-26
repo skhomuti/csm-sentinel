@@ -10,14 +10,13 @@ import web3.exceptions
 from web3 import AsyncWeb3, WebSocketProvider
 from eth_utils import event_abi_to_log_topic, get_all_event_abis
 from web3.utils.subscriptions import (
-    NewHeadsSubscription,
-    LogsSubscription, NewHeadsSubscriptionContext, LogsSubscriptionContext,
+    LogsSubscription,
+    LogsSubscriptionContext,
 )
 from web3._utils.events import get_event_data
 from web3.types import EventData, FilterParams
 from websockets import ConnectionClosed
 
-from csm_bot.utils import normalize_block_number
 from csm_bot.config import Config, get_config
 from csm_bot.texts import EVENT_DESCRIPTIONS
 from csm_bot.models import (
@@ -146,7 +145,10 @@ class Subscription:
     @staticmethod
     def _filter_vebo_exit_requests(event: Event):
         cfg = get_config()
-        return cfg.staking_module_id is not None and event.args["stakingModuleId"] == cfg.staking_module_id
+        return (
+            cfg.staking_module_id is not None
+            and event.args["stakingModuleId"] == cfg.staking_module_id
+        )
 
     @reconnect
     async def subscribe(self):
@@ -154,34 +156,35 @@ class Subscription:
             return
         async for w3 in self.w3:
             vebo = w3.eth.contract(address=self.cfg.vebo_address, abi=VEBO_ABI)
-            fee_distributor = w3.eth.contract(address=self.cfg.fee_distributor_address, abi=FEE_DISTRIBUTOR_ABI)
+            fee_distributor = w3.eth.contract(
+                address=self.cfg.fee_distributor_address, abi=FEE_DISTRIBUTOR_ABI
+            )
 
             subs_module = LogsSubscription(
-                address=self.cfg.module_address,
-                handler=self._handle_event_log_subscription
+                address=self.cfg.module_address, handler=self._handle_event_log_subscription
             )
             subs_acc = LogsSubscription(
-                address=self.cfg.accounting_address,
-                handler=self._handle_event_log_subscription
+                address=self.cfg.accounting_address, handler=self._handle_event_log_subscription
             )
             subs_vebo = LogsSubscription(
                 address=self.cfg.vebo_address,
                 topics=[vebo.events.ValidatorExitRequest().topic],
                 handler=self._handle_event_log_subscription,
-                handler_context={"predicate": self._filter_vebo_exit_requests}
+                handler_context={"predicate": self._filter_vebo_exit_requests},
             )
             subs_fd = LogsSubscription(
                 address=self.cfg.fee_distributor_address,
                 topics=[fee_distributor.events.DistributionLogUpdated().topic],
-                handler=self._handle_event_log_subscription
+                handler=self._handle_event_log_subscription,
             )
             subs_ep = LogsSubscription(
                 address=self.cfg.exit_penalties_address,
                 handler=self._handle_event_log_subscription,
             )
 
-            subs_heads = NewHeadsSubscription(handler=self._handle_new_block_subscription)
-            await w3.subscription_manager.subscribe([subs_module, subs_acc, subs_vebo, subs_fd, subs_ep, subs_heads])
+            await w3.subscription_manager.subscribe(
+                [subs_module, subs_acc, subs_vebo, subs_fd, subs_ep]
+            )
             logger.info("Subscriptions started")
             self._subscriptions_started.set()
 
@@ -189,7 +192,6 @@ class Subscription:
 
             if self._shutdown_event.is_set():
                 break
-
 
     async def process_blocks_from(self, start_block: int, end_block: int | None = None):
         w3 = await anext(self.backfill_w3)
@@ -241,7 +243,9 @@ class Subscription:
                         tx=event_data["transactionHash"],
                         address=event_data["address"],
                     )
-                    if contract == self.cfg.vebo_address and not self._filter_vebo_exit_requests(event):
+                    if contract == self.cfg.vebo_address and not self._filter_vebo_exit_requests(
+                        event
+                    ):
                         continue
                     await self.process_event_log(event)
                     await asyncio.sleep(0)
@@ -249,7 +253,6 @@ class Subscription:
                 break
             await self.process_new_block(Block(number=batch_end))
             logger.debug("Processed blocks up to %s", batch_end)
-
 
     async def _throttle_process_blocks_request(self):
         if self._process_blocks_request_interval is None:
@@ -265,11 +268,6 @@ class Subscription:
                 now = loop.time()
         self._last_process_blocks_request_ts = now
 
-
-    async def _handle_new_block_subscription(self, context: NewHeadsSubscriptionContext):
-        num = context.result["number"]
-        await self.process_new_block_from_subscription(Block(number=normalize_block_number(num)))
-
     async def _handle_event_log_subscription(self, context: LogsSubscriptionContext):
         # web3 stubs type `context.result` too broadly; treat as a log receipt-like mapping.
         result = cast(dict[str, Any], context.result)
@@ -279,11 +277,13 @@ class Subscription:
             return
         event_data: EventData = get_event_data(self._w3.codec, event_abi, result)
 
-        event = Event(event=event_data["event"],
-                      args=event_data["args"],
-                      block=event_data["blockNumber"],
-                      tx=event_data["transactionHash"],
-                      address=event_data["address"])
+        event = Event(
+            event=event_data["event"],
+            args=event_data["args"],
+            block=event_data["blockNumber"],
+            tx=event_data["transactionHash"],
+            address=event_data["address"],
+        )
         if hasattr(context, "predicate") and not context.predicate(event):
             return
         await self.process_event_log_from_subscription(event)
@@ -299,11 +299,6 @@ class Subscription:
 
         await self.process_event_log(event)
 
-    async def process_new_block_from_subscription(self, block: Block):
-        """Handle a block update received via the live subscription."""
-
-        await self.process_new_block(block)
-
 
 class TerminalSubscription(Subscription):
     async def process_event_log(self, event: Event):
@@ -313,7 +308,7 @@ class TerminalSubscription(Subscription):
         logger.warning("Current block number: %s", block.number)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     provider = AsyncWeb3(WebSocketProvider(os.getenv("WEB3_SOCKET_PROVIDER")))
 
     allowed_events = set(EVENT_DESCRIPTIONS.keys())
