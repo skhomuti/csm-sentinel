@@ -69,6 +69,7 @@ class Config:
 
 _CONFIG: Config | None = None
 RPC_DISCOVERY_TIMEOUT_SECONDS = 30
+RPC_DISCOVERY_RETRY_DELAY_SECONDS = 10
 
 
 async def _build_config_from_env() -> Config:
@@ -86,13 +87,10 @@ async def _build_config_from_env() -> Config:
     if not module_address:
         raise RuntimeError("MODULE_ADDRESS or CSM_ADDRESS must be configured")
 
-    try:
-        addresses = await asyncio.wait_for(
-            _discover_contract_addresses(web3_socket_provider, module_address),
-            timeout=RPC_DISCOVERY_TIMEOUT_SECONDS,
-        )
-    except asyncio.TimeoutError as exc:
-        raise RuntimeError("Timed out discovering contract addresses from WEB3 provider") from exc
+    addresses = await _discover_contract_addresses_with_retry(
+        web3_socket_provider,
+        module_address,
+    )
 
     process_blocks_requests_per_second = os.getenv("PROCESS_BLOCKS_REQUESTS_PER_SECOND")
     if process_blocks_requests_per_second:
@@ -169,3 +167,23 @@ async def _discover_contract_addresses(provider_url: str, module_address: str):
     from csm_bot.app.contracts import discover_contract_addresses_from_url
 
     return await discover_contract_addresses_from_url(provider_url, module_address)
+
+
+async def _discover_contract_addresses_with_retry(provider_url: str, module_address: str):
+    attempt = 1
+    while True:
+        try:
+            return await asyncio.wait_for(
+                _discover_contract_addresses(provider_url, module_address),
+                timeout=RPC_DISCOVERY_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Timed out discovering contract addresses from WEB3 provider after %ss "
+                "(attempt %s). Retrying in %ss.",
+                RPC_DISCOVERY_TIMEOUT_SECONDS,
+                attempt,
+                RPC_DISCOVERY_RETRY_DELAY_SECONDS,
+            )
+            attempt += 1
+            await asyncio.sleep(RPC_DISCOVERY_RETRY_DELAY_SECONDS)

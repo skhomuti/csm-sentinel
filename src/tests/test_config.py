@@ -7,22 +7,31 @@ from csm_bot.module_types import ModuleType
 
 
 @pytest.mark.asyncio
-async def test_get_config_async_fails_when_rpc_times_out(monkeypatch):
+async def test_get_config_async_retries_when_rpc_times_out(monkeypatch, fake_contract_addresses):
     clear_config()
 
     monkeypatch.setenv("WEB3_SOCKET_PROVIDER", "wss://example.invalid/ws")
-    monkeypatch.setenv("CSM_ADDRESS", "0x0000000000000000000000000000000000000001")
+    monkeypatch.setenv("MODULE_ADDRESS", "0x0000000000000000000000000000000000000001")
 
+    attempts = 0
     async def fake_discover_contract_addresses(provider_url: str, module_address: str):
-        raise asyncio.TimeoutError
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise asyncio.TimeoutError
+        return fake_contract_addresses(module_address)
 
     monkeypatch.setattr(
         "csm_bot.config._discover_contract_addresses",
         fake_discover_contract_addresses,
     )
+    monkeypatch.setattr("csm_bot.config.RPC_DISCOVERY_RETRY_DELAY_SECONDS", 0)
 
-    with pytest.raises(RuntimeError, match="Timed out"):
-        await get_config_async()
+    cfg = await get_config_async()
+
+    assert attempts == 2
+    assert cfg.module_address == "0x0000000000000000000000000000000000000001"
+    clear_config()
 
 
 @pytest.mark.asyncio
