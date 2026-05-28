@@ -1,9 +1,6 @@
-## Release label
+## Archived repository
 
-Apply one release label before merging:
+This repository is archived and no longer accepts changes.
 
-- `release:major` for breaking changes
-- `release:minor` for backward-compatible features
-- `release:patch` for fixes and internal changes that should roll into the next release
-
-If no `release:*` label is applied, release preparation treats the PR as `release:patch`.
+Please open issues and pull requests in the upstream repository:
+https://github.com/lidofinance/sm-sentinel

@@ -1,3 +1,6 @@
+# Disabled: this repository is archived. Active workflows live in
+# https://github.com/lidofinance/sm-sentinel.
+
 name: Build and Publish Docker Image
 
 on:

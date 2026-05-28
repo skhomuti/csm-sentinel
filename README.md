@@ -1,12 +1,17 @@
-# CSM Sentinel
+# CSM Sentinel (archived)
+
+> [!IMPORTANT]
+> This repository is archived and no longer maintained.
+> Active development has moved to [lidofinance/sm-sentinel](https://github.com/lidofinance/sm-sentinel), which is the upstream repository for issues, pull requests, documentation, releases, and container images.
 
 CSM Sentinel is a Telegram bot that sends notifications for Lido staking module Node Operator events.
 It supports both the Community Staking Module (CSM) and Curated Module deployments.
 
-This bot was developed and is maintained by [@skhomuti](https://github.com/skhomuti), a member of the Lido Protocol community, 
-to simplify the process of [subscribing to the important events for CSM](https://docs.lido.fi/staking-modules/csm/guides/events/). 
-You can either [run the bot yourself](https://github.com/skhomuti/csm-sentinel?tab=readme-ov-file#running-your-own-instance) 
-or use the [community-supported public instance](https://github.com/skhomuti/csm-sentinel?tab=readme-ov-file#public-instances), depending on your privacy preferences.
+This bot was originally developed by [@skhomuti](https://github.com/skhomuti), a member of the Lido Protocol community,
+to simplify the process of [subscribing to the important events for CSM](https://docs.lido.fi/staking-modules/csm/guides/events/).
+For current setup instructions, support, and ongoing maintenance, use [lidofinance/sm-sentinel](https://github.com/lidofinance/sm-sentinel).
+
+The documentation below is retained for historical reference for this archived repository.
 
 ## Module support
 
@@ -57,26 +62,10 @@ docker run -d --env-file=.env --name csm-sentinel -v csm-sentinel-persistent:/ap
 
 ## Container images
 
-Public container images are published to GitHub Container Registry for this repository:
+Container image publishing is disabled in this archived repository.
+Use the upstream [lidofinance/sm-sentinel](https://github.com/lidofinance/sm-sentinel) repository for current image publishing and release information.
 
-```bash
-docker pull ghcr.io/skhomuti/csm-sentinel:latest
-```
-
-Image tags follow the Git ref that triggered the workflow:
-
-- Pull requests build the image for validation but do not publish it
-- Each merge to `main` refreshes a draft prerelease suggestion in GitHub Releases
-- Publishing a prerelease with tag `vX.Y.ZrcN` publishes `ghcr.io/skhomuti/csm-sentinel:X.Y.ZrcN`
-- Publishing a stable release with tag `vX.Y.Z` publishes `ghcr.io/skhomuti/csm-sentinel:X.Y.Z`, `X.Y`, `X`, and `latest`
-
-Suggested prerelease bumps are driven by pull request labels:
-
-- `release:major` for breaking changes
-- `release:minor` for backward-compatible features
-- `release:patch` for fixes and other release-worthy changes
-
-If no `release:*` label is applied, the next draft prerelease treats the change as a patch.
+Historical images, if still available, were published under `ghcr.io/skhomuti/csm-sentinel`.
 
 ## Local development
 
